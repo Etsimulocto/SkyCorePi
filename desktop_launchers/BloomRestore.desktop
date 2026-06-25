@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=BloomRestore
+Comment=BloomCore restore points and notes
+Exec=python3 /home/quarterbitgames/BloomRestore/bloom_restore.py
+Icon=system-software-update
+Terminal=false
+Categories=Utility;
