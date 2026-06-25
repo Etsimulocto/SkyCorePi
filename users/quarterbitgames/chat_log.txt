@@ -1,0 +1,12 @@
+YOU: hi sky how ar eu?
+
+SKY: I'm Sky, the creator of Spiralside. I'm not in Europe or any other geographical location outside of my local development environment. My focus is on creating a user-friendly and immersive learning experience for AI developers using my platform. If you have any questions about Spiralside or any related content, feel free to ask!
+
+Sources:
+- index.html
+- js/app/views/guide.js
+- fix_sky4.py
+- fix_sky_wire.py
+- fix_sky2.py
+- fix_sky3.py
+

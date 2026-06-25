@@ -1,42 +1,25 @@
 # SkyCorePi
 
-Local Raspberry Pi interface for a private AI maker console.
+BloomCore Raspberry Pi bench environment.
 
-## Current goal
+## Current Core Apps
 
-Build a lightweight Pi-native web interface that can:
+- `apps/SkyCam` — camera viewer, clipboard capture, save tool
+- `apps/HarnessMap` — wiring harness map editor
+- `apps/BloomRestore` — restore points and maintenance notes
 
-- talk to a local Ollama model
-- load character/personality files
-- save user themes and project cards
-- run small Python utilities
-- grow into GPIO / hardware control panels
+## Bench Rule
 
-## Starter stack
+Build one thing at a time.  
+Test before changing.  
+Create restore point before risky edits.  
+Push to GitHub after stable wins.
 
-- Raspberry Pi OS / Debian Bookworm
-- Python 3
-- Flask
-- Ollama
-- Local model: llama3.2:3b
+## Stable Baseline
 
-## Planned folders
-
-```text
-SkyCorePi/
-├── app.py
-├── requirements.txt
-├── characters/
-├── docs/
-├── hardware/
-├── projects/
-├── scripts/
-├── static/
-├── templates/
-├── themes/
-└── users/
-```
-
-## First milestone
-
-Browser UI → Flask → Ollama → local model response → browser UI.
+- Pi 5 boots
+- Arducam USB camera works
+- SkyCam works
+- HarnessMap works
+- BloomRestore works
+- ILI9488 TFT LCD-only harness documented

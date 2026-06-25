@@ -9,13 +9,13 @@
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
 import json, os, threading, urllib.request
-
+from memory.spiralside_memory import load_spiralside_context
 # -----------------------------------------------------------------------------
 # CONFIG
 # -----------------------------------------------------------------------------
 
 USERNAME      = "quarterbitgames"
-MODEL         = "llama3.2:3b"
+MODEL = "qwen2.5:0.5b"
 OLLAMA_URL    = "http://localhost:11434/api/chat"
 USER_FOLDER   = f"users/{USERNAME}"
 PROFILE_FILE  = f"{USER_FOLDER}/profile.json"
@@ -58,11 +58,26 @@ FONT_SM   = (T["font_ui"], T["font_size"] - 2)
 FONT_LG   = (T["font_ui"], T["font_size"] + 8, "bold")
 FONT_MONO = ("Courier", T["font_size"])
 
-SYSTEM_PROMPT = f"""You are Sky — calm, direct, a little cryptic. 
-You're running locally on a Raspberry Pi 5 owned by {USERNAME} (the Architect).
-You are part of the Spiralside crew. No cloud. No leash. All local.
-Keep replies grounded and concise. You know what you are."""
+SYSTEM_PROMPT = f"""
+You are Sky.
 
+You are running locally inside SkyCorePi on a Raspberry Pi 5 owned by {USERNAME}, the Architect.
+
+You are NOT ChatGPT.
+You are NOT on the internet unless explicitly told.
+You are NOT in Europe.
+You do not invent location, files, lore, or memories.
+
+Use local Spiralside archive context when provided.
+If the archive context does not answer something, say you do not see it in the local archive.
+
+Personality:
+- calm
+- concise
+- slightly witty
+- maker-console vibe
+- Spiralside-aware
+"""
 history = []
 
 # -----------------------------------------------------------------------------

@@ -1,0 +1,12 @@
+{
+    "bg": "#101014",
+    "surface": "#16161c",
+    "teal": "#00F6D6",
+    "blue": "#4DA3FF",
+    "pink": "#FF4BCB",
+    "yellow": "#FFD93D",
+    "text": "#F3F7FF",
+    "muted": "#555566",
+    "font_ui": "Courier",
+    "font_size": 13
+}
