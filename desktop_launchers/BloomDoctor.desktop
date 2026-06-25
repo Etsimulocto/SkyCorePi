@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=BloomDoctor
+Comment=BloomCore bench health checker
+Exec=python3 /home/quarterbitgames/BloomDoctor/bloom_doctor.py
+Icon=utilities-system-monitor
+Terminal=false
+Categories=Utility;
