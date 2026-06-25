@@ -7,6 +7,7 @@ BloomCore Raspberry Pi bench environment.
 - `apps/SkyCam` — camera viewer, clipboard capture, save tool
 - `apps/HarnessMap` — wiring harness map editor
 - `apps/BloomRestore` — restore points and maintenance notes
+- `apps/BloomFrame` — image frame studio with knobs, sliders, presets, live preview, and export
 
 ## Bench Rule
 
