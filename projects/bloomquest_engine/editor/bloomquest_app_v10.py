@@ -2,7 +2,7 @@
 # run with: imported by bloomquest_v10.py
 # path: projects/bloomquest_engine/editor/bloomquest_app_v10.py
 # description: Adds editable enemy behavior, movement, damage, rewards, death effects, and respawn settings.
-# version: 0.10.0
+# version: 0.10.1
 # updated: 2026-06-25
 # format: bloomcore/v1.3
 # tags: bloomquest, enemies, ai, properties, combat, pygame
@@ -27,6 +27,7 @@ from editor.bloomquest_app import (
     CANVAS_TOP,
     CANVAS_WIDTH,
     TILE_SIZE,
+    TOP_BAR_HEIGHT,
     TextField,
     safe_int,
 )
@@ -51,7 +52,6 @@ class BloomQuestAppV10(BloomQuestAppV09):
         )
 
     def build_fields(self) -> None:
-        """Build normal fields plus enemy-specific AI controls."""
         if not self.selected_instance:
             return
 
@@ -94,7 +94,6 @@ class BloomQuestAppV10(BloomQuestAppV09):
         self.field_by_key = {field.key: field for field in self.fields}
 
     def apply_properties(self) -> None:
-        """Apply common properties and normalized enemy settings."""
         if not self.selected_instance:
             return
 
@@ -139,7 +138,6 @@ class BloomQuestAppV10(BloomQuestAppV09):
         self.status_message = f"Updated {target['name']}"
 
     def save_selected_as_new_part(self) -> None:
-        """Save custom enemy AI values into the active project library."""
         selected = self.selected_instance
         super().save_selected_as_new_part()
         if not selected or not self.parts:
@@ -171,7 +169,6 @@ class BloomQuestAppV10(BloomQuestAppV09):
             json.dump(payload, handle, indent=2, ensure_ascii=False)
 
     def place_or_select(self, gx: int, gy: int) -> None:
-        """Place normally, then copy AI defaults from reusable enemy parts."""
         previous_count = len(self.room.get("layers", {}).get(self.active_layer, []))
         super().place_or_select(gx, gy)
         current_count = len(self.room.get("layers", {}).get(self.active_layer, []))
@@ -201,7 +198,6 @@ class BloomQuestAppV10(BloomQuestAppV09):
         self.build_fields()
 
     def enter_play_mode(self) -> None:
-        """Start the v0.10 runtime while keeping project isolation."""
         self.save_current_room()
         has_player = any(
             item.get("part_id") == "player"
@@ -233,7 +229,7 @@ class BloomQuestAppV10(BloomQuestAppV09):
     def draw_play_mode(self) -> None:
         super().draw_play_mode()
 
-        from editor.bloomquest_app import MUTED_TEXT, TOP_BAR_HEIGHT, draw_text
+        from editor.bloomquest_app import MUTED_TEXT, draw_text
 
         draw_text(self.screen, "Enemy AI:", 18, TOP_BAR_HEIGHT + 454, self.font_small)
         draw_text(self.screen, "Idle / Patrol / Wander", 18, TOP_BAR_HEIGHT + 478, self.font_small, MUTED_TEXT)
