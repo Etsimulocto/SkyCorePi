@@ -2,7 +2,7 @@
 # run with: imported by bloomquest_v11.py
 # path: projects/bloomquest_engine/editor/bloomquest_app_v11.py
 # description: Adds Bow, Wand, Bombs, weapon switching, firing controls, and project weapon-library syncing.
-# version: 0.11.0
+# version: 0.11.1
 # updated: 2026-06-25
 # format: bloomcore/v1.3
 # tags: bloomquest, weapons, bow, wand, bombs, gamepad, pygame
@@ -31,6 +31,7 @@ from editor.bloomquest_app import (
     TOP_BAR_HEIGHT,
     draw_text,
 )
+from editor.bloomquest_app_v09 import BloomQuestAppV09
 from editor.bloomquest_app_v103 import BloomQuestAppV103
 from engine.world_play_v11 import WorldPlayV11
 
@@ -73,6 +74,16 @@ class BloomQuestAppV11(BloomQuestAppV103):
         super().open_project(project_id, save_current)
         if hasattr(self, "project_manager"):
             self.sync_project_weapon_presets()
+
+    def apply_properties(self) -> None:
+        """Apply enemy fields only when the selected item actually has them."""
+        if not self.selected_instance:
+            return
+
+        if self.is_enemy(self.selected_instance) and "behavior" in self.field_by_key:
+            super().apply_properties()
+        else:
+            BloomQuestAppV09.apply_properties(self)
 
     def enter_play_mode(self) -> None:
         self.save_current_room()
