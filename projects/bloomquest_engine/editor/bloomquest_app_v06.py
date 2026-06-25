@@ -2,7 +2,7 @@
 # run with: imported by bloomquest_v06.py
 # path: projects/bloomquest_engine/editor/bloomquest_app_v06.py
 # description: Adds proper Unicode TEXTINPUT handling for Windows emoji picker and clipboard paste.
-# version: 0.6.0
+# version: 0.6.1
 # updated: 2026-06-25
 # format: bloomcore/v1.3
 # tags: bloomquest, emoji, unicode, textinput, windows, pygame
@@ -27,8 +27,6 @@ class BloomQuestAppV06(BloomQuestAppV05):
     def __init__(self) -> None:
         super().__init__()
         pygame.display.set_caption("BloomQuest Engine v0.6")
-
-        # TEXTINPUT is required for Windows' Win + . emoji picker.
         pygame.key.start_text_input()
 
         try:
@@ -39,32 +37,24 @@ class BloomQuestAppV06(BloomQuestAppV05):
         self.status_message = "v0.6 ready. Click Emoji / Symbol, then press Win + ."
 
     def active_text_field(self):
-        """Return the currently focused property field, if any."""
         return next((field for field in self.fields if field.active), None)
 
     def handle_events(self) -> None:
-        """Handle Unicode text separately from physical key presses."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-
             elif event.type == pygame.TEXTINPUT:
                 field = self.active_text_field()
-                if field is not None:
-                    if not field.numeric:
-                        field.value += event.text
-
+                if field is not None and not field.numeric:
+                    field.value += event.text
             elif event.type == pygame.KEYDOWN:
                 self.handle_key(event)
-
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 self.handle_click(event)
-
             elif event.type == pygame.MOUSEWHEEL:
                 self.handle_wheel(event)
 
     def handle_key(self, event: pygame.event.Event) -> None:
-        """Avoid double typing while preserving editing and shortcuts."""
         field = self.active_text_field()
 
         if field is not None:
@@ -73,34 +63,27 @@ class BloomQuestAppV06(BloomQuestAppV05):
             if control and event.key == pygame.K_v:
                 self.paste_into_field(field)
                 return
-
             if event.key == pygame.K_BACKSPACE:
                 field.value = field.value[:-1]
                 return
-
             if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 if field.multiline:
                     field.value += " "
                 else:
                     field.active = False
                 return
-
             if event.key == pygame.K_TAB:
                 field.active = False
                 return
-
             if field.numeric and event.unicode:
                 if event.unicode.isdigit() or (event.unicode == "-" and not field.value):
                     field.value += event.unicode
                 return
-
-            # Printable text is received through pygame.TEXTINPUT.
             return
 
         super().handle_key(event)
 
     def paste_into_field(self, field) -> None:
-        """Paste UTF-8 clipboard text, including emoji, into a field."""
         try:
             raw = pygame.scrap.get(pygame.SCRAP_TEXT)
             if not raw:
@@ -122,7 +105,8 @@ class BloomQuestAppV06(BloomQuestAppV05):
     def draw_top_bar(self) -> None:
         super().draw_top_bar()
 
-        # Cover only the inherited title text, not the layer controls.
+        # Keep the title inside its reserved 275-pixel area so it never
+        # overlaps the Map or Scene Objects buttons.
         title_rect = pygame.Rect(0, 0, 275, 54)
         pygame.draw.rect(self.screen, (35, 39, 47), title_rect)
 
@@ -130,10 +114,18 @@ class BloomQuestAppV06(BloomQuestAppV05):
 
         draw_text(
             self.screen,
-            f"BloomQuest v0.6 — {self.current_room_id}",
+            "BloomQuest v0.6",
             14,
-            13,
+            8,
             self.font_large,
+        )
+        draw_text(
+            self.screen,
+            self.current_room_id,
+            16,
+            34,
+            self.font_small,
+            (165, 172, 184),
         )
 
     def help_content(self, page: str) -> list[str]:
