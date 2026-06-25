@@ -2,7 +2,7 @@
 # run with: imported by bloomquest_v06.py
 # path: projects/bloomquest_engine/editor/bloomquest_app_v06.py
 # description: Adds proper Unicode TEXTINPUT handling for Windows emoji picker and clipboard paste.
-# version: 0.6.1
+# version: 0.6.2
 # updated: 2026-06-25
 # format: bloomcore/v1.3
 # tags: bloomquest, emoji, unicode, textinput, windows, pygame
@@ -18,6 +18,18 @@ from __future__ import annotations
 
 import pygame
 
+from editor.bloomquest_app import (
+    ACCENT,
+    BACKGROUND,
+    LAYER_LABELS,
+    LAYER_ORDER,
+    MUTED_TEXT,
+    PANEL,
+    PANEL_ALT,
+    TEXT,
+    TOP_BAR_HEIGHT,
+    draw_text,
+)
 from editor.bloomquest_app_v05 import BloomQuestAppV05
 
 
@@ -103,30 +115,39 @@ class BloomQuestAppV06(BloomQuestAppV05):
             self.status_message = "Clipboard paste was unavailable. Win + . should still work."
 
     def draw_top_bar(self) -> None:
-        super().draw_top_bar()
+        """Draw the entire top bar cleanly so no inherited title remains."""
+        pygame.draw.rect(self.screen, PANEL, (0, 0, self.screen.get_width(), TOP_BAR_HEIGHT))
 
-        # Keep the title inside its reserved 275-pixel area so it never
-        # overlaps the Map or Scene Objects buttons.
-        title_rect = pygame.Rect(0, 0, 275, 54)
-        pygame.draw.rect(self.screen, (35, 39, 47), title_rect)
+        # Compact two-line title stays inside the reserved left area.
+        draw_text(self.screen, "BloomQuest v0.6", 14, 5, self.font_large)
+        draw_text(self.screen, self.current_room_id, 16, 32, self.font_small, MUTED_TEXT)
 
-        from editor.bloomquest_app import draw_text
+        if self.mode != "edit":
+            return
 
-        draw_text(
-            self.screen,
-            "BloomQuest v0.6",
-            14,
-            8,
-            self.font_large,
-        )
-        draw_text(
-            self.screen,
-            self.current_room_id,
-            16,
-            34,
-            self.font_small,
-            (165, 172, 184),
-        )
+        # Layer controls begin after the complete title area.
+        button_x = 280
+        for layer in LAYER_ORDER:
+            rect = pygame.Rect(button_x, 10, 140, 34)
+            active = layer == self.active_layer
+            pygame.draw.rect(self.screen, ACCENT if active else PANEL_ALT, rect, border_radius=6)
+            image = self.font_small.render(
+                LAYER_LABELS[layer],
+                True,
+                BACKGROUND if active else TEXT,
+            )
+            self.screen.blit(image, image.get_rect(center=rect.center))
+            button_x += 146
+
+        for rect, label in (
+            (self.rooms_button, "Rooms"),
+            (self.help_button, "Help"),
+            (self.play_button, "▶ Play"),
+        ):
+            is_play = label == "▶ Play"
+            pygame.draw.rect(self.screen, ACCENT if is_play else PANEL_ALT, rect, border_radius=6)
+            image = self.font_small.render(label, True, BACKGROUND if is_play else TEXT)
+            self.screen.blit(image, image.get_rect(center=rect.center))
 
     def help_content(self, page: str) -> list[str]:
         content = super().help_content(page)
