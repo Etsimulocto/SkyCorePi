@@ -1,0 +1,16 @@
+{
+  "name": "restore_2026-06-25_00-13-57",
+  "created": "2026-06-25 00:13:57",
+  "notes": "============================================================\nSKY NOTES\n============================================================\n\nRegression Risk:\nHIGH\n\nChanged Modules:\nSkyCam\n\nDependencies:\nOpenCV\nPillow\nv4l2-ctl\nxclip\nwl-copy\n\nDesktop:\nX11\n\nCamera:\nArducam 8MP USB\n\nRecovery Order:\n\n1 SkyCam\n\n2 HarnessMap\n\n3 GPIO\n\n4 TFT\n\n5 Controller\n\nKnown Good:\nYES\n\nVerified By:\nArchitect\n\n============================================================Stable checkpoint notes here...",
+  "copied": [
+    "/home/quarterbitgames/SkyCam",
+    "/home/quarterbitgames/HarnessMap",
+    "/home/quarterbitgames/Desktop/SkyCam.desktop",
+    "/home/quarterbitgames/Desktop/HarnessMap.desktop",
+    "/home/quarterbitgames/.local/share/applications/SkyCam.desktop",
+    "/home/quarterbitgames/.local/share/applications/HarnessMap.desktop",
+    "/home/quarterbitgames/.config/autostart/skycam.desktop",
+    "/home/quarterbitgames/.config/autostart/harnessmap.desktop"
+  ],
+  "missing": []
+}

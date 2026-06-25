@@ -1,0 +1,234 @@
+
+======================================================================
+2026-06-25 00:11:14
+Bloom journal created.
+============================================================
+BloomCore Restore Point
+============================================================
+
+Restore #: 0001
+
+Name:
+Initial Camera + Harness Bench
+
+Date:
+2026-06-25
+
+Status:
+STABLE
+
+------------------------------------------------------------
+Working
+------------------------------------------------------------
+
+✔ Raspberry Pi 5
+✔ Arducam 8MP USB Camera
+✔ SkyCam
+✔ HarnessMap
+✔ Clipboard
+✔ Desktop Icons
+✔ TFT LCD (ILI9488 LCD only)
+
+------------------------------------------------------------
+Known Issues
+------------------------------------------------------------
+
+• Camera struggles with macro focus.
+• Touch controller not wired yet.
+• 8BitDo not configured.
+• Clipboard must support both X11 and Wayland.
+
+------------------------------------------------------------
+Hardware
+------------------------------------------------------------
+
+Pi 5
+
+Arducam USB
+
+ILI9488 3.5"
+
+RJ45 Harness
+
+USB Switch
+
+------------------------------------------------------------
+Software Added
+------------------------------------------------------------
+
+SkyCam
+
+HarnessMap
+
+BloomRestore
+
+------------------------------------------------------------
+Files Added
+------------------------------------------------------------
+
+~/SkyCam
+
+~/HarnessMap
+
+~/BloomRestore
+
+------------------------------------------------------------
+Things Changed
+------------------------------------------------------------
+
+Desktop launchers
+
+Autostart entries
+
+Camera controls
+
+Clipboard support
+
+------------------------------------------------------------
+Things NOT to Touch
+------------------------------------------------------------
+
+Working TFT harness
+
+SkyCam reconnect logic
+
+Desktop launchers
+
+------------------------------------------------------------
+Next Goal
+------------------------------------------------------------
+
+GPIO Monitor
+
+------------------------------------------------------------
+Future Ideas
+------------------------------------------------------------
+
+Auto detect Arducam
+
+Project Manager
+
+Bench Lights
+
+GPIO Live Monitor
+
+Camera Gallery
+
+Macro Camera
+
+Controller Support
+
+------------------------------------------------------------
+Lessons Learned
+------------------------------------------------------------
+
+Always meter RJ45 conductors.
+
+Bad ground causes haunted LCD.
+
+Never assume /dev/video0.
+
+Support X11 and Wayland.
+
+Always create restore point before changing working code.
+
+------------------------------------------------------------
+Sky Notes
+------------------------------------------------------------
+
+This restore point is considered SAFE.
+
+Return here if future development breaks
+camera, TFT, or desktop applications.
+
+============================================================
+============================================================
+SKY NOTES
+============================================================
+
+Regression Risk:
+HIGH
+
+Changed Modules:
+SkyCam
+
+Dependencies:
+OpenCV
+Pillow
+v4l2-ctl
+xclip
+wl-copy
+
+Desktop:
+X11
+
+Camera:
+Arducam 8MP USB
+
+Recovery Order:
+
+1 SkyCam
+
+2 HarnessMap
+
+3 GPIO
+
+4 TFT
+
+5 Controller
+
+Known Good:
+YES
+
+Verified By:
+Architect
+
+============================================================
+
+======================================================================
+2026-06-25 00:13:57
+Created restore point: restore_2026-06-25_00-13-57
+
+Notes:
+============================================================
+SKY NOTES
+============================================================
+
+Regression Risk:
+HIGH
+
+Changed Modules:
+SkyCam
+
+Dependencies:
+OpenCV
+Pillow
+v4l2-ctl
+xclip
+wl-copy
+
+Desktop:
+X11
+
+Camera:
+Arducam 8MP USB
+
+Recovery Order:
+
+1 SkyCam
+
+2 HarnessMap
+
+3 GPIO
+
+4 TFT
+
+5 Controller
+
+Known Good:
+YES
+
+Verified By:
+Architect
+
+============================================================Stable checkpoint notes here...

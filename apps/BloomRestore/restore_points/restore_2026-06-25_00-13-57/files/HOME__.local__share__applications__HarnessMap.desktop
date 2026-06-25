@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=HarnessMap
+Comment=BloomCore wiring harness diagram
+Exec=python3 /home/quarterbitgames/HarnessMap/harness_map.py
+Icon=applications-engineering
+Terminal=false
+Categories=Utility;

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SkyCam
+Comment=BloomCore camera copy tool
+Exec=python3 /home/quarterbitgames/SkyCam/skycam.py
+Icon=camera-photo
+Terminal=false
+Categories=Utility;

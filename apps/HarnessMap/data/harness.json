@@ -1,0 +1,110 @@
+{
+  "project": "3.5 TFT SPI 480x320 ILI9488",
+  "tft_side_order": "SDO, LED, SCK, SDI, DC/RS, RESET, CS, GND, VCC",
+  "notes": [
+    "LCD-only harness verified.",
+    "RJ45 NOTE: Test every conductor with meter.",
+    "Bad ground caused blank/haunted screen."
+  ],
+  "wires": [
+    {
+      "label": "TFT-SDO",
+      "color": "Yellow",
+      "gpio": "GPIO9",
+      "pin": "Pin 21",
+      "device": "ILI9488 TFT",
+      "signal": "SDO / MISO",
+      "notes": "Optional / not used for LCD-only harness"
+    },
+    {
+      "label": "TFT-LED",
+      "color": "Brown",
+      "gpio": "3.3V",
+      "pin": "Pin 17",
+      "device": "ILI9488 TFT",
+      "signal": "LED",
+      "notes": "Backlight"
+    },
+    {
+      "label": "TFT-SCK",
+      "color": "Green",
+      "gpio": "GPIO11",
+      "pin": "Pin 23",
+      "device": "ILI9488 TFT",
+      "signal": "SCK",
+      "notes": "SPI clock"
+    },
+    {
+      "label": "TFT-SDI",
+      "color": "Orange",
+      "gpio": "GPIO10",
+      "pin": "Pin 19",
+      "device": "ILI9488 TFT",
+      "signal": "SDI / MOSI",
+      "notes": "SPI MOSI"
+    },
+    {
+      "label": "TFT-DC",
+      "color": "Purple",
+      "gpio": "GPIO24",
+      "pin": "Pin 18",
+      "device": "ILI9488 TFT",
+      "signal": "DC/RS",
+      "notes": "Data / command"
+    },
+    {
+      "label": "TFT-RESET",
+      "color": "White",
+      "gpio": "GPIO25",
+      "pin": "Pin 22",
+      "device": "ILI9488 TFT",
+      "signal": "RESET",
+      "notes": "Display reset"
+    },
+    {
+      "label": "TFT-CS",
+      "color": "Blue",
+      "gpio": "GPIO8",
+      "pin": "Pin 24",
+      "device": "ILI9488 TFT",
+      "signal": "CS / CE0",
+      "notes": "SPI chip select"
+    },
+    {
+      "label": "TFT-GND",
+      "color": "Black",
+      "gpio": "GND",
+      "pin": "Pin 6",
+      "device": "ILI9488 TFT",
+      "signal": "GND",
+      "notes": "Critical ground. Bad ground caused blank/haunted screen."
+    },
+    {
+      "label": "TFT-VCC",
+      "color": "Red",
+      "gpio": "3.3V",
+      "pin": "Pin 1",
+      "device": "ILI9488 TFT",
+      "signal": "VCC",
+      "notes": "3.3V power"
+    },
+    {
+      "label": "TOUCH-CS",
+      "color": "Grey",
+      "gpio": "GPIO7",
+      "pin": "Pin 26",
+      "device": "Future Touch",
+      "signal": "Touch CS",
+      "notes": "Reserved for future touch chip select"
+    },
+    {
+      "label": "TOUCH-IRQ",
+      "color": "Extra Brown",
+      "gpio": "GPIO17",
+      "pin": "Pin 11",
+      "device": "Future Touch",
+      "signal": "Touch IRQ",
+      "notes": "Reserved for future touch interrupt"
+    }
+  ]
+}
