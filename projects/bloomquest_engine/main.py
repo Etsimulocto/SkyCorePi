@@ -1,18 +1,18 @@
 # main.py
 # run with: python main.py
 # path: projects/bloomquest_engine/main.py
-# description: First runnable BloomQuest editor prototype with a grid, premade parts palette, four layers, click-to-place editing, and JSON room saving.
-# version: 0.1.0
+# description: BloomQuest editor with a 128x128 grid, premade parts, four layers, editable properties, and JSON room saving.
+# version: 0.2.0
 # updated: 2026-06-25
 # format: bloomcore/v1.3
-# tags: bloomquest, pygame, editor, grid, emoji, json, prototype
+# tags: bloomquest, pygame, editor, grid, emoji, json, properties
 # gpio: none
 # dependencies: pygame-ce >= 2.5.7
 # author: bloomcraft/sky
 # license: MIT
 # hardware: Windows PC, Linux PC, or Raspberry Pi
-# notes: Uses colored tiles and emoji where the active system font supports them. Press Ctrl+S to save and Ctrl+L to load.
-# uuid: bc-bloomquest-editor-0001
+# notes: Left-click places/selects. Right-click erases. Shift+left-click selects the topmost object. Ctrl+S saves. Ctrl+L loads.
+# uuid: bc-bloomquest-editor-0002
 
 from __future__ import annotations
 
@@ -25,17 +25,13 @@ from typing import Any
 import pygame
 
 
-# -----------------------------------------------------------------------------
-# Paths and constants
-# -----------------------------------------------------------------------------
-
 ROOT_DIR = Path(__file__).resolve().parent
 PARTS_FILE = ROOT_DIR / "data" / "parts" / "parts_library.json"
 ROOMS_DIR = ROOT_DIR / "data" / "rooms"
 ROOM_FILE = ROOMS_DIR / "room_001.json"
 
-WINDOW_WIDTH = 1280
-WINDOW_HEIGHT = 800
+WINDOW_WIDTH = 1360
+WINDOW_HEIGHT = 840
 FPS = 60
 
 GRID_COLUMNS = 128
@@ -43,7 +39,7 @@ GRID_ROWS = 128
 TILE_SIZE = 32
 
 PALETTE_WIDTH = 250
-PROPERTIES_WIDTH = 280
+PROPERTIES_WIDTH = 360
 TOP_BAR_HEIGHT = 54
 STATUS_BAR_HEIGHT = 30
 
@@ -62,9 +58,20 @@ LAYER_LABELS = {
     "weapons_effects": "Weapons / Effects",
 }
 
+ACTION_TYPES = [
+    "none",
+    "show_text",
+    "add_counter",
+    "teleport",
+    "damage_player",
+    "heal_player",
+    "timer",
+]
+
 BACKGROUND = (25, 28, 34)
 PANEL = (35, 39, 47)
 PANEL_ALT = (43, 48, 58)
+FIELD = (26, 30, 37)
 TEXT = (235, 238, 244)
 MUTED_TEXT = (165, 172, 184)
 GRID_LINE = (65, 72, 84)
@@ -73,13 +80,7 @@ SELECTION = (245, 210, 90)
 DANGER = (215, 85, 85)
 
 
-# -----------------------------------------------------------------------------
-# Data helpers
-# -----------------------------------------------------------------------------
-
-
 def load_parts_library() -> list[dict[str, Any]]:
-    """Load the premade BloomQuest parts library."""
     if not PARTS_FILE.exists():
         raise FileNotFoundError(f"Missing parts library: {PARTS_FILE}")
 
@@ -94,9 +95,8 @@ def load_parts_library() -> list[dict[str, Any]]:
 
 
 def make_blank_room() -> dict[str, Any]:
-    """Create a fresh room document using the current engine format."""
     return {
-        "format": "bloomquest/room-v0.1",
+        "format": "bloomquest/room-v0.2",
         "room_id": "room_001",
         "name": "First Room",
         "grid": {
@@ -116,36 +116,26 @@ def make_blank_room() -> dict[str, Any]:
 
 
 def save_room(room: dict[str, Any]) -> None:
-    """Save the current room to a readable JSON file."""
     ROOMS_DIR.mkdir(parents=True, exist_ok=True)
     with ROOM_FILE.open("w", encoding="utf-8") as file_handle:
         json.dump(room, file_handle, indent=2, ensure_ascii=False)
 
 
 def load_room() -> dict[str, Any]:
-    """Load room_001.json if it exists, otherwise return a blank room."""
     if not ROOM_FILE.exists():
         return make_blank_room()
 
     with ROOM_FILE.open("r", encoding="utf-8") as file_handle:
         room = json.load(file_handle)
 
-    if "layers" not in room:
-        room["layers"] = {layer_name: [] for layer_name in LAYER_ORDER}
-
+    room.setdefault("layers", {})
     for layer_name in LAYER_ORDER:
         room["layers"].setdefault(layer_name, [])
 
     return room
 
 
-# -----------------------------------------------------------------------------
-# Drawing helpers
-# -----------------------------------------------------------------------------
-
-
 def get_font(size: int, bold: bool = False) -> pygame.font.Font:
-    """Return a broadly available font with emoji fallback where supported."""
     preferred_fonts = [
         "Segoe UI Emoji",
         "Segoe UI Symbol",
@@ -170,7 +160,6 @@ def draw_text(
     font: pygame.font.Font,
     color: tuple[int, int, int] = TEXT,
 ) -> pygame.Rect:
-    """Draw text and return its rectangle."""
     rendered = font.render(text, True, color)
     rect = rendered.get_rect(topleft=position)
     surface.blit(rendered, rect)
@@ -178,21 +167,56 @@ def draw_text(
 
 
 def clamp(value: int, minimum: int, maximum: int) -> int:
-    """Clamp an integer to a safe range."""
     return max(minimum, min(maximum, value))
 
 
-# -----------------------------------------------------------------------------
-# Editor application
-# -----------------------------------------------------------------------------
+def safe_int(value: str, fallback: int = 0) -> int:
+    try:
+        return int(value.strip())
+    except (TypeError, ValueError):
+        return fallback
+
+
+class TextField:
+    def __init__(
+        self,
+        key: str,
+        label: str,
+        value: str = "",
+        multiline: bool = False,
+        numeric: bool = False,
+    ) -> None:
+        self.key = key
+        self.label = label
+        self.value = str(value)
+        self.multiline = multiline
+        self.numeric = numeric
+        self.active = False
+        self.rect = pygame.Rect(0, 0, 100, 32)
+
+    def handle_key(self, event: pygame.event.Event) -> None:
+        if not self.active:
+            return
+
+        if event.key == pygame.K_BACKSPACE:
+            self.value = self.value[:-1]
+        elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            if self.multiline:
+                self.value += " "
+            else:
+                self.active = False
+        elif event.key == pygame.K_TAB:
+            self.active = False
+        elif event.unicode and event.unicode.isprintable():
+            if self.numeric and not (event.unicode.isdigit() or (event.unicode == "-" and not self.value)):
+                return
+            self.value += event.unicode
 
 
 class BloomQuestEditor:
-    """Small first-pass editor proving the BloomQuest architecture."""
-
     def __init__(self) -> None:
         pygame.init()
-        pygame.display.set_caption("BloomQuest Engine v0.1")
+        pygame.display.set_caption("BloomQuest Engine v0.2")
 
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         self.clock = pygame.time.Clock()
@@ -211,18 +235,22 @@ class BloomQuestEditor:
 
         self.camera_x = 0
         self.camera_y = 0
-
         self.palette_scroll = 0
+        self.properties_scroll = 0
+
+        self.fields: list[TextField] = []
+        self.field_by_key: dict[str, TextField] = {}
+        self.apply_button = pygame.Rect(0, 0, 0, 0)
+        self.action_button = pygame.Rect(0, 0, 0, 0)
+
         self.status_message = "Ready. Choose a part and click the grid."
         self.running = True
 
     @property
     def selected_part(self) -> dict[str, Any]:
-        """Return the currently selected library part."""
         return self.parts[self.selected_part_index]
 
     def visible_parts(self) -> list[tuple[int, dict[str, Any]]]:
-        """Return parts belonging to the active layer."""
         return [
             (index, part)
             for index, part in enumerate(self.parts)
@@ -230,7 +258,6 @@ class BloomQuestEditor:
         ]
 
     def run(self) -> None:
-        """Run the main editor loop."""
         while self.running:
             self.handle_events()
             self.draw()
@@ -240,7 +267,6 @@ class BloomQuestEditor:
         pygame.quit()
 
     def handle_events(self) -> None:
-        """Handle keyboard and mouse input."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -252,9 +278,11 @@ class BloomQuestEditor:
                 self.handle_mouse_down(event)
 
             elif event.type == pygame.MOUSEWHEEL:
-                mouse_x, mouse_y = pygame.mouse.get_pos()
+                mouse_x, _ = pygame.mouse.get_pos()
                 if mouse_x < PALETTE_WIDTH:
                     self.palette_scroll = max(0, self.palette_scroll - event.y * 30)
+                elif mouse_x >= CANVAS_RIGHT:
+                    self.properties_scroll = max(0, self.properties_scroll - event.y * 34)
                 elif CANVAS_LEFT <= mouse_x < CANVAS_RIGHT:
                     self.camera_y = clamp(
                         self.camera_y - event.y * TILE_SIZE,
@@ -263,49 +291,48 @@ class BloomQuestEditor:
                     )
 
     def handle_keydown(self, event: pygame.event.Event) -> None:
-        """Handle editor shortcuts."""
+        active_field = next((field for field in self.fields if field.active), None)
+        if active_field is not None:
+            active_field.handle_key(event)
+            return
+
         control_down = bool(event.mod & pygame.KMOD_CTRL)
 
         if event.key == pygame.K_ESCAPE:
             self.running = False
-
         elif control_down and event.key == pygame.K_s:
             save_room(self.room)
             self.status_message = f"Saved {ROOM_FILE.name}"
-
         elif control_down and event.key == pygame.K_l:
             self.room = load_room()
-            self.selected_instance = None
+            self.clear_selection()
             self.status_message = f"Loaded {ROOM_FILE.name}"
-
         elif event.key == pygame.K_DELETE and self.selected_instance is not None:
             self.delete_selected_instance()
-
         elif event.key == pygame.K_LEFT:
             self.camera_x = max(0, self.camera_x - TILE_SIZE)
-
         elif event.key == pygame.K_RIGHT:
-            self.camera_x = min(
-                max(0, GRID_COLUMNS * TILE_SIZE - CANVAS_WIDTH),
-                self.camera_x + TILE_SIZE,
-            )
-
+            self.camera_x = min(max(0, GRID_COLUMNS * TILE_SIZE - CANVAS_WIDTH), self.camera_x + TILE_SIZE)
         elif event.key == pygame.K_UP:
             self.camera_y = max(0, self.camera_y - TILE_SIZE)
-
         elif event.key == pygame.K_DOWN:
-            self.camera_y = min(
-                max(0, GRID_ROWS * TILE_SIZE - CANVAS_HEIGHT),
-                self.camera_y + TILE_SIZE,
-            )
-
+            self.camera_y = min(max(0, GRID_ROWS * TILE_SIZE - CANVAS_HEIGHT), self.camera_y + TILE_SIZE)
         elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
-            layer_index = event.key - pygame.K_1
-            self.set_active_layer(LAYER_ORDER[layer_index])
+            self.set_active_layer(LAYER_ORDER[event.key - pygame.K_1])
 
     def handle_mouse_down(self, event: pygame.event.Event) -> None:
-        """Route clicks to the correct editor area."""
         mouse_x, mouse_y = event.pos
+
+        for field in self.fields:
+            field.active = field.rect.collidepoint(mouse_x, mouse_y)
+
+        if self.apply_button.collidepoint(mouse_x, mouse_y):
+            self.apply_property_changes()
+            return
+
+        if self.action_button.collidepoint(mouse_x, mouse_y):
+            self.cycle_action_type()
+            return
 
         if mouse_y < TOP_BAR_HEIGHT:
             self.handle_top_bar_click(mouse_x, mouse_y)
@@ -315,19 +342,23 @@ class BloomQuestEditor:
             self.handle_palette_click(mouse_x, mouse_y)
             return
 
+        if mouse_x >= CANVAS_RIGHT:
+            return
+
         if CANVAS_LEFT <= mouse_x < CANVAS_RIGHT and CANVAS_TOP <= mouse_y < CANVAS_BOTTOM:
             grid_x, grid_y = self.screen_to_grid(mouse_x, mouse_y)
-
             if not self.grid_position_valid(grid_x, grid_y):
                 return
 
             if event.button == 1:
-                self.place_or_select_part(grid_x, grid_y)
+                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    self.select_topmost(grid_x, grid_y)
+                else:
+                    self.place_or_select_part(grid_x, grid_y)
             elif event.button == 3:
                 self.erase_at(grid_x, grid_y)
 
     def handle_top_bar_click(self, mouse_x: int, mouse_y: int) -> None:
-        """Change active layers using the top bar buttons."""
         button_x = 310
         button_width = 155
 
@@ -339,9 +370,8 @@ class BloomQuestEditor:
             button_x += button_width + 8
 
     def set_active_layer(self, layer_name: str) -> None:
-        """Switch the current layer and choose its first available part."""
         self.active_layer = layer_name
-        self.selected_instance = None
+        self.clear_selection()
         self.palette_scroll = 0
 
         for index, part in enumerate(self.parts):
@@ -352,7 +382,6 @@ class BloomQuestEditor:
         self.status_message = f"Layer: {LAYER_LABELS[layer_name]}"
 
     def handle_palette_click(self, mouse_x: int, mouse_y: int) -> None:
-        """Select a premade part from the palette."""
         start_y = TOP_BAR_HEIGHT + 62 - self.palette_scroll
         row_height = 48
 
@@ -360,38 +389,45 @@ class BloomQuestEditor:
             row_rect = pygame.Rect(10, start_y + visible_row * row_height, PALETTE_WIDTH - 20, 42)
             if row_rect.collidepoint(mouse_x, mouse_y):
                 self.selected_part_index = part_index
-                self.selected_instance = None
+                self.clear_selection()
                 self.status_message = f"Selected {part['name']}"
                 return
 
     def screen_to_grid(self, mouse_x: int, mouse_y: int) -> tuple[int, int]:
-        """Convert screen coordinates into room grid coordinates."""
         world_x = mouse_x - CANVAS_LEFT + self.camera_x
         world_y = mouse_y - CANVAS_TOP + self.camera_y
         return world_x // TILE_SIZE, world_y // TILE_SIZE
 
     def grid_position_valid(self, grid_x: int, grid_y: int) -> bool:
-        """Return whether the position is inside the 128 x 128 map."""
         return 0 <= grid_x < GRID_COLUMNS and 0 <= grid_y < GRID_ROWS
 
     def find_instance_at(self, grid_x: int, grid_y: int, layer_name: str | None = None) -> dict[str, Any] | None:
-        """Find the topmost instance occupying one grid cell."""
         layers = [layer_name] if layer_name else list(reversed(LAYER_ORDER))
-
         for current_layer in layers:
             for instance in reversed(self.room["layers"].get(current_layer, [])):
                 if instance.get("x") == grid_x and instance.get("y") == grid_y:
                     return instance
-
         return None
 
+    def select_topmost(self, grid_x: int, grid_y: int) -> None:
+        instance = self.find_instance_at(grid_x, grid_y)
+        if instance is None:
+            self.clear_selection()
+            self.status_message = "Nothing selected."
+            return
+
+        self.selected_instance = instance
+        self.active_layer = instance.get("layer", self.active_layer)
+        self.build_property_fields()
+        self.status_message = f"Selected {instance.get('name', 'part')}"
+
     def place_or_select_part(self, grid_x: int, grid_y: int) -> None:
-        """Place the selected premade part or select an existing matching-layer part."""
         existing = self.find_instance_at(grid_x, grid_y, self.active_layer)
         selected_part = self.selected_part
 
         if existing and existing.get("part_id") == selected_part.get("id"):
             self.selected_instance = existing
+            self.build_property_fields()
             self.status_message = f"Selected placed {existing.get('name', 'part')}"
             return
 
@@ -419,38 +455,100 @@ class BloomQuestEditor:
 
         self.room["layers"][self.active_layer].append(instance)
         self.selected_instance = instance
+        self.build_property_fields()
         self.status_message = f"Placed {instance['name']} at {grid_x}, {grid_y}"
 
     def erase_at(self, grid_x: int, grid_y: int) -> None:
-        """Erase the active-layer part at a grid position."""
         existing = self.find_instance_at(grid_x, grid_y, self.active_layer)
         if existing is None:
             return
 
         self.room["layers"][self.active_layer].remove(existing)
-
         if self.selected_instance is existing:
-            self.selected_instance = None
-
+            self.clear_selection()
         self.status_message = f"Erased part at {grid_x}, {grid_y}"
 
     def delete_selected_instance(self) -> None:
-        """Delete the currently selected placed instance."""
         if self.selected_instance is None:
             return
 
         layer_name = self.selected_instance.get("layer", self.active_layer)
         layer_items = self.room["layers"].get(layer_name, [])
-
         if self.selected_instance in layer_items:
             name = self.selected_instance.get("name", "part")
             layer_items.remove(self.selected_instance)
             self.status_message = f"Deleted {name}"
+        self.clear_selection()
 
+    def clear_selection(self) -> None:
         self.selected_instance = None
+        self.fields = []
+        self.field_by_key = {}
+        self.properties_scroll = 0
+
+    def build_property_fields(self) -> None:
+        if self.selected_instance is None:
+            self.fields = []
+            self.field_by_key = {}
+            return
+
+        target = self.selected_instance
+        action = target.get("action", {})
+
+        fields = [
+            TextField("name", "Name", target.get("name", "")),
+            TextField("description", "Description", target.get("description", ""), multiline=True),
+            TextField("text", "Text / Dialogue", action.get("text", ""), multiline=True),
+            TextField("counter", "Counter", action.get("counter", "")),
+            TextField("amount", "Value / Amount", action.get("amount", "0"), numeric=True),
+            TextField("health", "Health", target.get("health", "0"), numeric=True),
+            TextField("damage", "Damage", target.get("damage", "0"), numeric=True),
+            TextField("target_room", "Target Room", action.get("target_room", "")),
+            TextField("target_x", "Target X", action.get("target_x", "0"), numeric=True),
+            TextField("target_y", "Target Y", action.get("target_y", "0"), numeric=True),
+            TextField("seconds", "Timer Seconds", action.get("seconds", "0"), numeric=True),
+        ]
+
+        self.fields = fields
+        self.field_by_key = {field.key: field for field in fields}
+        self.properties_scroll = 0
+
+    def cycle_action_type(self) -> None:
+        if self.selected_instance is None:
+            return
+
+        action = self.selected_instance.setdefault("action", {})
+        current_type = action.get("type", "none")
+        try:
+            current_index = ACTION_TYPES.index(current_type)
+        except ValueError:
+            current_index = 0
+
+        action["type"] = ACTION_TYPES[(current_index + 1) % len(ACTION_TYPES)]
+        self.status_message = f"Action type: {action['type']}"
+
+    def apply_property_changes(self) -> None:
+        if self.selected_instance is None:
+            return
+
+        target = self.selected_instance
+        target["name"] = self.field_by_key["name"].value.strip() or target.get("name", "Part")
+        target["description"] = self.field_by_key["description"].value.strip()
+        target["health"] = safe_int(self.field_by_key["health"].value, target.get("health", 0))
+        target["damage"] = safe_int(self.field_by_key["damage"].value, target.get("damage", 0))
+
+        action = target.setdefault("action", {})
+        action["text"] = self.field_by_key["text"].value.strip()
+        action["counter"] = self.field_by_key["counter"].value.strip()
+        action["amount"] = safe_int(self.field_by_key["amount"].value, action.get("amount", 0))
+        action["target_room"] = self.field_by_key["target_room"].value.strip()
+        action["target_x"] = safe_int(self.field_by_key["target_x"].value, action.get("target_x", 0))
+        action["target_y"] = safe_int(self.field_by_key["target_y"].value, action.get("target_y", 0))
+        action["seconds"] = safe_int(self.field_by_key["seconds"].value, action.get("seconds", 0))
+
+        self.status_message = f"Updated {target['name']}"
 
     def draw(self) -> None:
-        """Draw the complete editor interface."""
         self.screen.fill(BACKGROUND)
         self.draw_top_bar()
         self.draw_palette()
@@ -459,78 +557,53 @@ class BloomQuestEditor:
         self.draw_status_bar()
 
     def draw_top_bar(self) -> None:
-        """Draw the title and layer buttons."""
         pygame.draw.rect(self.screen, PANEL, (0, 0, WINDOW_WIDTH, TOP_BAR_HEIGHT))
-        draw_text(self.screen, "BloomQuest v0.1", (16, 13), self.font_large)
+        draw_text(self.screen, "BloomQuest v0.2", (16, 13), self.font_large)
 
         button_x = 310
         button_width = 155
-
         for layer_name in LAYER_ORDER:
             is_active = layer_name == self.active_layer
             button_color = ACCENT if is_active else PANEL_ALT
             text_color = BACKGROUND if is_active else TEXT
             button_rect = pygame.Rect(button_x, 10, button_width, 34)
             pygame.draw.rect(self.screen, button_color, button_rect, border_radius=6)
-            label = LAYER_LABELS[layer_name]
-            label_surface = self.font_small.render(label, True, text_color)
-            label_rect = label_surface.get_rect(center=button_rect.center)
-            self.screen.blit(label_surface, label_rect)
+            label_surface = self.font_small.render(LAYER_LABELS[layer_name], True, text_color)
+            self.screen.blit(label_surface, label_surface.get_rect(center=button_rect.center))
             button_x += button_width + 8
 
     def draw_palette(self) -> None:
-        """Draw the premade parts list."""
-        palette_rect = pygame.Rect(0, TOP_BAR_HEIGHT, PALETTE_WIDTH, WINDOW_HEIGHT - TOP_BAR_HEIGHT)
-        pygame.draw.rect(self.screen, PANEL, palette_rect)
-
+        pygame.draw.rect(self.screen, PANEL, (0, TOP_BAR_HEIGHT, PALETTE_WIDTH, WINDOW_HEIGHT - TOP_BAR_HEIGHT))
         draw_text(self.screen, "Premade Parts", (14, TOP_BAR_HEIGHT + 12), self.font_medium)
-        draw_text(
-            self.screen,
-            LAYER_LABELS[self.active_layer],
-            (14, TOP_BAR_HEIGHT + 36),
-            self.font_small,
-            MUTED_TEXT,
-        )
+        draw_text(self.screen, LAYER_LABELS[self.active_layer], (14, TOP_BAR_HEIGHT + 36), self.font_small, MUTED_TEXT)
 
         start_y = TOP_BAR_HEIGHT + 62 - self.palette_scroll
         row_height = 48
 
         for visible_row, (part_index, part) in enumerate(self.visible_parts()):
             row_y = start_y + visible_row * row_height
-
             if row_y + 42 < TOP_BAR_HEIGHT + 58 or row_y > CANVAS_BOTTOM:
                 continue
 
-            is_selected = part_index == self.selected_part_index
-            row_color = (72, 83, 78) if is_selected else PANEL_ALT
+            row_color = (72, 83, 78) if part_index == self.selected_part_index else PANEL_ALT
             row_rect = pygame.Rect(10, row_y, PALETTE_WIDTH - 20, 42)
             pygame.draw.rect(self.screen, row_color, row_rect, border_radius=5)
 
-            emoji = part.get("emoji", "")
-            color = tuple(part.get("color", [180, 180, 180]))
-
             icon_rect = pygame.Rect(16, row_y + 6, 30, 30)
-            pygame.draw.rect(self.screen, color, icon_rect, border_radius=4)
+            pygame.draw.rect(self.screen, tuple(part.get("color", [180, 180, 180])), icon_rect, border_radius=4)
 
+            emoji = part.get("emoji", "")
             if emoji:
                 emoji_surface = self.font_emoji.render(emoji, True, TEXT)
-                emoji_rect = emoji_surface.get_rect(center=icon_rect.center)
-                self.screen.blit(emoji_surface, emoji_rect)
+                self.screen.blit(emoji_surface, emoji_surface.get_rect(center=icon_rect.center))
 
             draw_text(self.screen, part.get("name", "Part"), (54, row_y + 11), self.font_small)
 
-        pygame.draw.line(
-            self.screen,
-            GRID_LINE,
-            (PALETTE_WIDTH - 1, TOP_BAR_HEIGHT),
-            (PALETTE_WIDTH - 1, WINDOW_HEIGHT),
-        )
+        pygame.draw.line(self.screen, GRID_LINE, (PALETTE_WIDTH - 1, TOP_BAR_HEIGHT), (PALETTE_WIDTH - 1, WINDOW_HEIGHT))
 
     def draw_canvas(self) -> None:
-        """Draw the visible grid and every placed part."""
         canvas_rect = pygame.Rect(CANVAS_LEFT, CANVAS_TOP, CANVAS_WIDTH, CANVAS_HEIGHT)
         pygame.draw.rect(self.screen, (20, 23, 28), canvas_rect)
-
         self.screen.set_clip(canvas_rect)
 
         start_column = self.camera_x // TILE_SIZE
@@ -542,8 +615,7 @@ class BloomQuestEditor:
             for grid_x in range(start_column, end_column):
                 screen_x = CANVAS_LEFT + grid_x * TILE_SIZE - self.camera_x
                 screen_y = CANVAS_TOP + grid_y * TILE_SIZE - self.camera_y
-                cell_rect = pygame.Rect(screen_x, screen_y, TILE_SIZE, TILE_SIZE)
-                pygame.draw.rect(self.screen, GRID_LINE, cell_rect, width=1)
+                pygame.draw.rect(self.screen, GRID_LINE, (screen_x, screen_y, TILE_SIZE, TILE_SIZE), width=1)
 
         for layer_name in LAYER_ORDER:
             for instance in self.room["layers"].get(layer_name, []):
@@ -553,11 +625,8 @@ class BloomQuestEditor:
         pygame.draw.rect(self.screen, GRID_LINE, canvas_rect, width=1)
 
     def draw_instance(self, instance: dict[str, Any]) -> None:
-        """Draw one placed part using its color and emoji."""
-        grid_x = int(instance.get("x", 0))
-        grid_y = int(instance.get("y", 0))
-        screen_x = CANVAS_LEFT + grid_x * TILE_SIZE - self.camera_x
-        screen_y = CANVAS_TOP + grid_y * TILE_SIZE - self.camera_y
+        screen_x = CANVAS_LEFT + int(instance.get("x", 0)) * TILE_SIZE - self.camera_x
+        screen_y = CANVAS_TOP + int(instance.get("y", 0)) * TILE_SIZE - self.camera_y
 
         if screen_x + TILE_SIZE < CANVAS_LEFT or screen_x > CANVAS_RIGHT:
             return
@@ -565,120 +634,109 @@ class BloomQuestEditor:
             return
 
         cell_rect = pygame.Rect(screen_x + 1, screen_y + 1, TILE_SIZE - 2, TILE_SIZE - 2)
-        color = tuple(instance.get("color", [180, 180, 180]))
-        pygame.draw.rect(self.screen, color, cell_rect, border_radius=3)
+        pygame.draw.rect(self.screen, tuple(instance.get("color", [180, 180, 180])), cell_rect, border_radius=3)
 
         emoji = instance.get("emoji", "")
         if emoji:
             emoji_surface = self.font_emoji.render(emoji, True, TEXT)
-            emoji_rect = emoji_surface.get_rect(center=cell_rect.center)
-            self.screen.blit(emoji_surface, emoji_rect)
+            self.screen.blit(emoji_surface, emoji_surface.get_rect(center=cell_rect.center))
 
         if instance is self.selected_instance:
             pygame.draw.rect(self.screen, SELECTION, cell_rect, width=3, border_radius=3)
 
     def draw_properties_panel(self) -> None:
-        """Draw selected-part or selected-instance information."""
         panel_rect = pygame.Rect(CANVAS_RIGHT, TOP_BAR_HEIGHT, PROPERTIES_WIDTH, WINDOW_HEIGHT - TOP_BAR_HEIGHT)
         pygame.draw.rect(self.screen, PANEL, panel_rect)
-        pygame.draw.line(
-            self.screen,
-            GRID_LINE,
-            (CANVAS_RIGHT, TOP_BAR_HEIGHT),
-            (CANVAS_RIGHT, WINDOW_HEIGHT),
-        )
+        pygame.draw.line(self.screen, GRID_LINE, (CANVAS_RIGHT, TOP_BAR_HEIGHT), (CANVAS_RIGHT, WINDOW_HEIGHT))
 
         draw_text(self.screen, "Properties", (CANVAS_RIGHT + 16, TOP_BAR_HEIGHT + 14), self.font_medium)
 
-        target = self.selected_instance if self.selected_instance is not None else self.selected_part
-        y = TOP_BAR_HEIGHT + 56
+        if self.selected_instance is None:
+            target = self.selected_part
+            y = TOP_BAR_HEIGHT + 62
+            emoji = target.get("emoji", "")
+            if emoji:
+                draw_text(self.screen, emoji, (CANVAS_RIGHT + 16, y), self.font_large)
+                draw_text(self.screen, target.get("name", "Part"), (CANVAS_RIGHT + 54, y + 2), self.font_medium)
+            else:
+                draw_text(self.screen, target.get("name", "Part"), (CANVAS_RIGHT + 16, y + 2), self.font_medium)
+
+            y += 52
+            draw_text(self.screen, "Place a part, then click it again", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
+            y += 22
+            draw_text(self.screen, "to edit its name, text, action,", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
+            y += 22
+            draw_text(self.screen, "health, damage, target, and timer.", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
+            return
+
+        target = self.selected_instance
+        y = TOP_BAR_HEIGHT + 52 - self.properties_scroll
 
         emoji = target.get("emoji", "")
-        name = target.get("name", "Unnamed")
-
         if emoji:
             draw_text(self.screen, emoji, (CANVAS_RIGHT + 16, y), self.font_large)
-            draw_text(self.screen, name, (CANVAS_RIGHT + 54, y + 2), self.font_medium)
+            draw_text(self.screen, target.get("name", "Part"), (CANVAS_RIGHT + 54, y + 2), self.font_medium)
         else:
-            draw_text(self.screen, name, (CANVAS_RIGHT + 16, y + 2), self.font_medium)
+            draw_text(self.screen, target.get("name", "Part"), (CANVAS_RIGHT + 16, y + 2), self.font_medium)
 
-        y += 42
-        fields = [
-            ("Layer", LAYER_LABELS.get(target.get("layer", self.active_layer), "Unknown")),
-            ("ID", target.get("instance_id", target.get("id", target.get("part_id", "-")))),
-            ("Solid", str(target.get("solid", False))),
-        ]
-
-        if self.selected_instance is not None:
-            fields.extend(
-                [
-                    ("Grid X", str(target.get("x", 0))),
-                    ("Grid Y", str(target.get("y", 0))),
-                    ("Enabled", str(target.get("enabled", True))),
-                ]
-            )
-
-        for label, value in fields:
-            draw_text(self.screen, label, (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
-            draw_text(self.screen, value, (CANVAS_RIGHT + 105, y), self.font_small)
-            y += 26
-
-        y += 8
-        draw_text(self.screen, "Description", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
+        y += 44
+        draw_text(self.screen, f"Layer: {LAYER_LABELS.get(target.get('layer', ''), 'Unknown')}", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
         y += 24
+        draw_text(self.screen, f"Grid: {target.get('x', 0)}, {target.get('y', 0)}", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
+        y += 34
 
-        description = str(target.get("description", ""))
-        wrapped_lines = self.wrap_text(description, PROPERTIES_WIDTH - 32, self.font_small)
+        action = target.get("action", {})
+        draw_text(self.screen, "Action Type", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
+        y += 22
+        self.action_button = pygame.Rect(CANVAS_RIGHT + 16, y, PROPERTIES_WIDTH - 32, 34)
+        pygame.draw.rect(self.screen, PANEL_ALT, self.action_button, border_radius=5)
+        action_name = action.get("type", "none")
+        action_surface = self.font_small.render(action_name, True, TEXT)
+        self.screen.blit(action_surface, action_surface.get_rect(center=self.action_button.center))
+        y += 48
 
-        for line in wrapped_lines[:5]:
-            draw_text(self.screen, line, (CANVAS_RIGHT + 16, y), self.font_small)
+        for field in self.fields:
+            draw_text(self.screen, field.label, (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
             y += 21
 
-        action = target.get("action")
-        if action:
-            y += 12
-            draw_text(self.screen, "Action", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
-            y += 24
+            field_height = 54 if field.multiline else 34
+            field.rect = pygame.Rect(CANVAS_RIGHT + 16, y, PROPERTIES_WIDTH - 32, field_height)
+            field_color = (52, 61, 72) if field.active else FIELD
+            pygame.draw.rect(self.screen, field_color, field.rect, border_radius=5)
+            pygame.draw.rect(self.screen, ACCENT if field.active else GRID_LINE, field.rect, width=2, border_radius=5)
 
-            for key, value in action.items():
-                action_line = f"{key}: {value}"
-                for line in self.wrap_text(action_line, PROPERTIES_WIDTH - 32, self.font_small):
-                    draw_text(self.screen, line, (CANVAS_RIGHT + 16, y), self.font_small)
-                    y += 20
+            display_value = field.value
+            max_chars = 78 if field.multiline else 34
+            if len(display_value) > max_chars:
+                display_value = display_value[-max_chars:]
 
-        y = WINDOW_HEIGHT - 150
-        draw_text(self.screen, "Controls", (CANVAS_RIGHT + 16, y), self.font_small, MUTED_TEXT)
-        y += 24
-        draw_text(self.screen, "Left click: place/select", (CANVAS_RIGHT + 16, y), self.font_small)
-        y += 21
-        draw_text(self.screen, "Right click: erase", (CANVAS_RIGHT + 16, y), self.font_small)
-        y += 21
-        draw_text(self.screen, "Arrows: pan map", (CANVAS_RIGHT + 16, y), self.font_small)
-        y += 21
-        draw_text(self.screen, "Ctrl+S save / Ctrl+L load", (CANVAS_RIGHT + 16, y), self.font_small)
+            lines = self.wrap_text(display_value, field.rect.width - 12, self.font_small)
+            for line_index, line in enumerate(lines[:2 if field.multiline else 1]):
+                draw_text(self.screen, line, (field.rect.x + 7, field.rect.y + 7 + line_index * 19), self.font_small)
+
+            y += field_height + 11
+
+        self.apply_button = pygame.Rect(CANVAS_RIGHT + 16, y + 4, PROPERTIES_WIDTH - 32, 40)
+        pygame.draw.rect(self.screen, ACCENT, self.apply_button, border_radius=6)
+        apply_surface = self.font_small.render("Apply Changes", True, BACKGROUND)
+        self.screen.blit(apply_surface, apply_surface.get_rect(center=self.apply_button.center))
 
     def draw_status_bar(self) -> None:
-        """Draw the bottom status bar."""
-        bar_rect = pygame.Rect(0, WINDOW_HEIGHT - STATUS_BAR_HEIGHT, WINDOW_WIDTH, STATUS_BAR_HEIGHT)
-        pygame.draw.rect(self.screen, PANEL_ALT, bar_rect)
-
+        pygame.draw.rect(self.screen, PANEL_ALT, (0, WINDOW_HEIGHT - STATUS_BAR_HEIGHT, WINDOW_WIDTH, STATUS_BAR_HEIGHT))
         draw_text(self.screen, self.status_message, (12, WINDOW_HEIGHT - 23), self.font_small)
 
-        camera_text = f"Camera: {self.camera_x // TILE_SIZE}, {self.camera_y // TILE_SIZE}"
+        camera_text = f"Camera: {self.camera_x // TILE_SIZE}, {self.camera_y // TILE_SIZE} | Shift+Click: select topmost"
         camera_surface = self.font_small.render(camera_text, True, MUTED_TEXT)
-        camera_rect = camera_surface.get_rect(midright=(WINDOW_WIDTH - 12, WINDOW_HEIGHT - 15))
-        self.screen.blit(camera_surface, camera_rect)
+        self.screen.blit(camera_surface, camera_surface.get_rect(midright=(WINDOW_WIDTH - 12, WINDOW_HEIGHT - 15)))
 
     @staticmethod
     def wrap_text(text: str, width: int, font: pygame.font.Font) -> list[str]:
-        """Wrap text to fit a pixel width."""
-        words = text.split()
+        words = str(text).split()
         if not words:
             return [""]
 
         lines: list[str] = []
         current_line = words[0]
-
         for word in words[1:]:
             test_line = f"{current_line} {word}"
             if font.size(test_line)[0] <= width:
@@ -686,18 +744,11 @@ class BloomQuestEditor:
             else:
                 lines.append(current_line)
                 current_line = word
-
         lines.append(current_line)
         return lines
 
 
-# -----------------------------------------------------------------------------
-# Main entry point
-# -----------------------------------------------------------------------------
-
-
 def main() -> int:
-    """Start BloomQuest and report readable startup errors."""
     try:
         editor = BloomQuestEditor()
         editor.run()
