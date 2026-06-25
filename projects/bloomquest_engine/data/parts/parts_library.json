@@ -1,0 +1,26 @@
+{
+  "format": "bloomquest/parts-v0.1",
+  "tile_size": 32,
+  "parts": [
+    {"id":"grass","emoji":"","name":"Grass","description":"Basic walkable grass tile.","layer":"map","color":[72,140,72],"solid":false},
+    {"id":"dirt","emoji":"","name":"Dirt","description":"Basic walkable dirt tile.","layer":"map","color":[145,105,70],"solid":false},
+    {"id":"water","emoji":"","name":"Water","description":"Water tile that blocks normal movement.","layer":"map","color":[55,110,190],"solid":true},
+    {"id":"wall","emoji":"🧱","name":"Wall","description":"Solid wall tile.","layer":"map","color":[105,105,115],"solid":true},
+    {"id":"tree","emoji":"🌳","name":"Tree","description":"A solid scene object.","layer":"scene_objects","color":[70,120,65],"solid":true},
+    {"id":"rock","emoji":"🪨","name":"Rock","description":"A solid rock obstacle.","layer":"scene_objects","color":[115,115,120],"solid":true},
+    {"id":"sign","emoji":"🪧","name":"Sign","description":"Displays user-entered text.","layer":"scene_objects","color":[150,110,65],"solid":true,"action":{"trigger":"player_use","type":"show_text","text":"Hello from BloomQuest!"}},
+    {"id":"door","emoji":"🚪","name":"Door","description":"Teleports the player to another room.","layer":"scene_objects","color":[130,85,45],"solid":false,"action":{"trigger":"player_touch","type":"teleport","target_room":"room_002","target_x":1,"target_y":1}},
+    {"id":"chest","emoji":"📦","name":"Chest","description":"A premade treasure chest.","layer":"scene_objects","color":[170,120,45],"solid":true,"action":{"trigger":"player_use","type":"add_counter","counter":"coins","amount":10}},
+    {"id":"player","emoji":"🧍","name":"Player","description":"Player start position.","layer":"actors","color":[235,235,235],"solid":false},
+    {"id":"villager","emoji":"🙂","name":"Villager","description":"Friendly NPC with editable dialogue.","layer":"actors","color":[235,205,150],"solid":true,"action":{"trigger":"player_use","type":"show_text","text":"Welcome to BloomQuest!"}},
+    {"id":"slime","emoji":"👾","name":"Slime","description":"Simple enemy preset.","layer":"actors","color":[120,220,120],"solid":true,"health":3,"damage":1},
+    {"id":"bat","emoji":"🦇","name":"Bat","description":"Flying enemy preset.","layer":"actors","color":[95,75,120],"solid":false,"health":2,"damage":1},
+    {"id":"coin","emoji":"🪙","name":"Coin","description":"Adds 1 to the coin counter.","layer":"scene_objects","color":[240,200,60],"solid":false,"action":{"trigger":"player_touch","type":"add_counter","counter":"coins","amount":1,"destroy_self":true}},
+    {"id":"heart","emoji":"❤️","name":"Heart","description":"Restores 1 health.","layer":"scene_objects","color":[220,60,70],"solid":false,"action":{"trigger":"player_touch","type":"add_counter","counter":"health","amount":1,"destroy_self":true}},
+    {"id":"key","emoji":"🗝️","name":"Key","description":"Adds 1 key.","layer":"scene_objects","color":[225,195,80],"solid":false,"action":{"trigger":"player_touch","type":"add_counter","counter":"keys","amount":1,"destroy_self":true}},
+    {"id":"sword","emoji":"🗡️","name":"Sword","description":"Basic weapon pickup.","layer":"weapons_effects","color":[210,210,220],"solid":false},
+    {"id":"sparkle","emoji":"✨","name":"Sparkle","description":"Simple visual effect.","layer":"weapons_effects","color":[240,230,120],"solid":false},
+    {"id":"explosion","emoji":"💥","name":"Explosion","description":"Simple explosion effect.","layer":"weapons_effects","color":[240,120,45],"solid":false},
+    {"id":"timer","emoji":"⏱️","name":"Timer","description":"Runs an action after a delay.","layer":"weapons_effects","color":[180,200,220],"solid":false,"action":{"trigger":"timer","seconds":5,"type":"show_text","text":"Timer finished!"}}
+  ]
+}
