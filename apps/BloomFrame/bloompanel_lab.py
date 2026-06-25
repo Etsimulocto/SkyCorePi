@@ -1,18 +1,18 @@
 # bloompanel_lab.py
 # run with: python3 bloompanel_lab.py
 # path: /home/quarterbitgames/SkyCorePi/apps/BloomFrame/bloompanel_lab.py
-# description: Workspace comic/panel lab for slicing multi-image pages, saving projects, generating layouts, applying procedural frames, and exporting reusable panel packs.
-# version: 0.1.0
+# description: Workspace comic/panel lab for slicing multi-image pages, freehand sketch masks, saving projects, generating layouts, applying procedural frames, and exporting reusable panel packs.
+# version: 0.2.0
 # updated: 2026-06-25
 # format: bloomcore/v1.3
-# tags: bloomcore, skycorepi, tkinter, pillow, comic, panels, workspace, project-save, layout-generator, batch-export
+# tags: bloomcore, skycorepi, tkinter, pillow, comic, panels, sketch-mask, workspace, project-save, layout-generator, batch-export
 # gpio: none
 # dependencies: Pillow >= 9.0
 # author: bloomcraft/sky
 # license: MIT
 # hardware: Raspberry Pi 5 / Windows PC / Linux desktop
-# notes: Creates a reusable BloomPanel workspace in the user's home folder. Source images are never overwritten.
-# uuid: bc-app-bloompanel-lab-20260625-001
+# notes: Creates a reusable BloomPanel workspace in the user's home folder. Source images are never overwritten. Sketch panels save polygon points into the project file.
+# uuid: bc-app-bloompanel-lab-20260625-002
 
 from __future__ import annotations
 
@@ -42,21 +42,27 @@ class PanelBox:
     x2: int
     y2: int
     name: str = "Panel"
+    points: Optional[list[list[int]]] = None
 
     def normalized(self) -> "PanelBox":
-        return PanelBox(min(self.x1, self.x2), min(self.y1, self.y2), max(self.x1, self.x2), max(self.y1, self.y2), self.name)
+        nx1, ny1 = min(self.x1, self.x2), min(self.y1, self.y2)
+        nx2, ny2 = max(self.x1, self.x2), max(self.y1, self.y2)
+        return PanelBox(nx1, ny1, nx2, ny2, self.name, self.points)
 
     def size(self) -> tuple[int, int]:
         b = self.normalized()
         return b.x2 - b.x1, b.y2 - b.y1
+
+    def is_sketch(self) -> bool:
+        return bool(self.points and len(self.points) >= 3)
 
 
 class BloomPanelLab:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(APP_TITLE)
-        self.root.geometry("1600x940")
-        self.root.minsize(1200, 760)
+        self.root.geometry("1640x960")
+        self.root.minsize(1220, 780)
         self.root.configure(bg="#0c0c12")
 
         self.workspace = Path.home() / WORKSPACE_NAME
@@ -75,6 +81,7 @@ class BloomPanelLab:
         self.offset_x = 0
         self.offset_y = 0
         self.drag_start = None
+        self.sketch_points_canvas: list[tuple[int, int]] = []
         self.preview_photo = None
         self.selected_photo = None
         self.thumb_photos: list[ImageTk.PhotoImage] = []
@@ -132,10 +139,10 @@ class BloomPanelLab:
         body.pack(fill=tk.BOTH, expand=True)
         left = tk.Frame(body, bg="#181820", width=390)
         center = tk.Frame(body, bg="#09090f")
-        right = tk.Frame(body, bg="#14141d", width=320)
+        right = tk.Frame(body, bg="#14141d", width=340)
         body.add(left, minsize=360)
         body.add(center, minsize=650)
-        body.add(right, minsize=280)
+        body.add(right, minsize=300)
 
         self.build_left(left)
         self.canvas = tk.Canvas(center, bg="#07070b", highlightthickness=0)
@@ -157,6 +164,25 @@ class BloomPanelLab:
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         bar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        self.add_title(inner, "Tools")
+        self.var("tool", tk.StringVar, "Rectangle Panel")
+        for label, value in [("▭ Rectangle Panel", "Rectangle Panel"), ("✎ Sketch Panel", "Sketch Panel"), ("↖ Select / Move", "Select")]:
+            tk.Radiobutton(inner, text=label, variable=self.vars["tool"], value=value, bg="#181820", fg="#eeeeff", selectcolor="#2b2b3a", activebackground="#181820", command=self.refresh_all).pack(anchor="w", padx=16, pady=2)
+
+        self.add_title(inner, "Sketch Mask")
+        self.add_slider(inner, "Stroke width", "sketch_width", 1, 36, 6)
+        self.add_slider(inner, "Smoothing", "sketch_smooth", 0, 90, 45)
+        self.add_slider(inner, "Simplify", "sketch_simplify", 0, 40, 8)
+        self.add_slider(inner, "Mask feather", "mask_feather", 0, 40, 2)
+        self.add_slider(inner, "Border wobble", "sketch_wobble", 0, 30, 8)
+        self.var("auto_close", tk.BooleanVar, True)
+        self.var("clip_to_sketch", tk.BooleanVar, True)
+        tk.Checkbutton(inner, text="Auto-close sketch shape", variable=self.vars["auto_close"], bg="#181820", fg="#eeeeff", selectcolor="#2b2b3a", activebackground="#181820").pack(anchor="w", padx=16, pady=2)
+        tk.Checkbutton(inner, text="Clip image to sketch mask", variable=self.vars["clip_to_sketch"], bg="#181820", fg="#eeeeff", selectcolor="#2b2b3a", activebackground="#181820", command=self.refresh_all).pack(anchor="w", padx=16, pady=2)
+        row = tk.Frame(inner, bg="#181820"); row.pack(fill=tk.X, padx=12, pady=5)
+        ttk.Button(row, text="Clear Sketch Panel", command=self.clear_selected_sketch).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row, text="Sketch Tool", command=lambda: self.vars["tool"].set("Sketch Panel")).pack(side=tk.LEFT, padx=2)
+
         self.add_title(inner, "Splitter")
         self.add_slider(inner, "Grid columns", "grid_cols", 1, 12, 3)
         self.add_slider(inner, "Grid rows", "grid_rows", 1, 12, 4)
@@ -165,8 +191,7 @@ class BloomPanelLab:
         self.add_slider(inner, "Trim edge", "trim", 0, 160, 6)
         self.add_slider(inner, "Detect dark", "detect_threshold", 0, 250, 52)
         self.add_slider(inner, "Min panel", "min_panel", 20, 900, 120)
-        row = tk.Frame(inner, bg="#181820")
-        row.pack(fill=tk.X, padx=12, pady=5)
+        row = tk.Frame(inner, bg="#181820"); row.pack(fill=tk.X, padx=12, pady=5)
         ttk.Button(row, text="Auto Grid", command=self.auto_grid).pack(side=tk.LEFT, padx=2)
         ttk.Button(row, text="Detect Gutters", command=self.auto_detect).pack(side=tk.LEFT, padx=2)
         ttk.Button(row, text="Clear", command=self.clear_panels).pack(side=tk.LEFT, padx=2)
@@ -203,11 +228,11 @@ class BloomPanelLab:
             tk.Checkbutton(inner, text=label, variable=self.vars[name], bg="#181820", fg="#eeeeff", selectcolor="#2b2b3a", activebackground="#181820", command=self.refresh_selected_preview).pack(anchor="w", padx=16, pady=3)
 
         self.add_title(inner, "Mouse")
-        tk.Label(inner, text="Left-drag empty area: draw panel\nClick panel: select\nRight-click panel: delete\nSave Project stores panel boxes + style\nExport Pack writes into BloomPanel/Exports", bg="#181820", fg="#cfcfe0", justify=tk.LEFT).pack(fill=tk.X, padx=16, pady=8)
+        tk.Label(inner, text="Rectangle tool: left-drag a box\nSketch tool: draw a closed-ish shape\nSelect tool: click a panel\nRight-click: delete panel\nSketch panels export as transparent masks", bg="#181820", fg="#cfcfe0", justify=tk.LEFT).pack(fill=tk.X, padx=16, pady=8)
 
     def build_right(self, parent):
         tk.Label(parent, text="RECENT PROJECTS", bg="#14141d", fg="#d7c4ff", font=("TkDefaultFont", 12, "bold")).pack(anchor="w", padx=10, pady=(9, 2))
-        self.recent_box = tk.Listbox(parent, height=6, bg="#101018", fg="white", selectbackground="#5b2cff", highlightthickness=0)
+        self.recent_box = tk.Listbox(parent, height=5, bg="#101018", fg="white", selectbackground="#5b2cff", highlightthickness=0)
         self.recent_box.pack(fill=tk.X, padx=8, pady=4)
         self.recent_box.bind("<Double-Button-1>", lambda _e: self.load_selected_recent())
 
@@ -216,29 +241,27 @@ class BloomPanelLab:
         strip_scroll = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=self.strip_canvas.yview)
         self.strip_inner = tk.Frame(self.strip_canvas, bg="#14141d")
         self.strip_inner.bind("<Configure>", lambda _e: self.strip_canvas.configure(scrollregion=self.strip_canvas.bbox("all")))
-        self.strip_canvas.create_window((0, 0), window=self.strip_inner, anchor="nw", width=292)
+        self.strip_canvas.create_window((0, 0), window=self.strip_inner, anchor="nw", width=310)
         self.strip_canvas.configure(yscrollcommand=strip_scroll.set)
         self.strip_canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=(6, 0), pady=3)
         strip_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        tk.Label(parent, text="FRAMED PREVIEW", bg="#14141d", fg="#d7c4ff", font=("TkDefaultFont", 12, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
-        self.preview_canvas = tk.Canvas(parent, bg="#08080d", highlightthickness=0, height=260)
+        tk.Label(parent, text="SKETCH / FRAMED PREVIEW", bg="#14141d", fg="#d7c4ff", font=("TkDefaultFont", 12, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
+        self.preview_canvas = tk.Canvas(parent, bg="#08080d", highlightthickness=0, height=285)
         self.preview_canvas.pack(fill=tk.X, padx=8, pady=8)
 
     def add_title(self, parent, text):
         tk.Label(parent, text=text, bg="#181820", fg="#d7c4ff", font=("TkDefaultFont", 12, "bold")).pack(anchor="w", padx=12, pady=(14, 6))
 
     def add_slider(self, parent, label, name, low, high, value):
-        row = tk.Frame(parent, bg="#181820")
-        row.pack(fill=tk.X, padx=10, pady=4)
+        row = tk.Frame(parent, bg="#181820"); row.pack(fill=tk.X, padx=10, pady=4)
         v = self.var(name, tk.IntVar, value)
         tk.Label(row, text=label, bg="#181820", fg="#eeeeff", width=15, anchor="w").pack(side=tk.LEFT)
         ttk.Scale(row, from_=low, to=high, variable=v, command=lambda _v: self.refresh_all()).pack(side=tk.LEFT, fill=tk.X, expand=True)
         tk.Spinbox(row, from_=low, to=high, textvariable=v, width=5, command=self.refresh_all, bg="#262634", fg="white", insertbackground="white", buttonbackground="#343448").pack(side=tk.RIGHT, padx=(6, 0))
 
     def add_combo(self, parent, label, name, values, value):
-        row = tk.Frame(parent, bg="#181820")
-        row.pack(fill=tk.X, padx=10, pady=5)
+        row = tk.Frame(parent, bg="#181820"); row.pack(fill=tk.X, padx=10, pady=5)
         tk.Label(row, text=label, bg="#181820", fg="#eeeeff", width=15, anchor="w").pack(side=tk.LEFT)
         v = self.var(name, tk.StringVar, value)
         combo = ttk.Combobox(row, textvariable=v, values=values, state="readonly")
@@ -246,21 +269,17 @@ class BloomPanelLab:
         combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_all())
 
     def add_color(self, parent, label, name, value):
-        row = tk.Frame(parent, bg="#181820")
-        row.pack(fill=tk.X, padx=10, pady=5)
+        row = tk.Frame(parent, bg="#181820"); row.pack(fill=tk.X, padx=10, pady=5)
         v = self.var(name, tk.StringVar, value)
         tk.Label(row, text=label, bg="#181820", fg="#eeeeff", width=15, anchor="w").pack(side=tk.LEFT)
         b = tk.Button(row, text=value, bg=value, fg=self.contrast(value), relief=tk.FLAT, width=13)
-        b.configure(command=lambda: self.pick_color(name, b))
-        b.pack(side=tk.LEFT)
+        b.configure(command=lambda: self.pick_color(name, b)); b.pack(side=tk.LEFT)
         self.color_buttons[name] = b
 
     def pick_color(self, name, button):
         color = colorchooser.askcolor(self.vars[name].get(), parent=self.root)[1]
         if color:
-            self.vars[name].set(color)
-            button.configure(text=color, bg=color, fg=self.contrast(color))
-            self.refresh_all()
+            self.vars[name].set(color); button.configure(text=color, bg=color, fg=self.contrast(color)); self.refresh_all()
 
     @staticmethod
     def contrast(color):
@@ -271,8 +290,7 @@ class BloomPanelLab:
             return "white"
 
     def refresh_all(self):
-        self.redraw_canvas()
-        self.refresh_selected_preview()
+        self.redraw_canvas(); self.refresh_selected_preview()
 
     def load_source(self):
         path = filedialog.askopenfilename(title="Load source page/collage", filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff"), ("All files", "*")])
@@ -284,11 +302,9 @@ class BloomPanelLab:
             stem = Path(path).stem[:48]
             if self.project_name.get() == "Untitled":
                 self.project_name.set(stem)
-            self.panels.clear()
-            self.selected_index = None
+            self.panels.clear(); self.selected_index = None
             self.status.set(f"Loaded {Path(path).name} — {self.source.width}×{self.source.height}")
-            self.refresh_all()
-            self.refresh_strip()
+            self.refresh_all(); self.refresh_strip()
         except Exception as error:
             messagebox.showerror(APP_TITLE, f"Could not load image:\n{error}")
 
@@ -296,13 +312,8 @@ class BloomPanelLab:
         name = simpledialog.askstring(APP_TITLE, "Project name:", initialvalue="BloomPanel Project")
         if not name:
             return
-        self.project_name.set(self.safe_name(name))
-        self.source = None
-        self.source_path = None
-        self.panels.clear()
-        self.selected_index = None
-        self.refresh_all()
-        self.refresh_strip()
+        self.project_name.set(self.safe_name(name)); self.source = None; self.source_path = None
+        self.panels.clear(); self.selected_index = None; self.refresh_all(); self.refresh_strip()
 
     def safe_name(self, name):
         safe = "".join(c if c.isalnum() or c in "-_ ." else "_" for c in name).strip()
@@ -313,24 +324,21 @@ class BloomPanelLab:
 
     def save_project(self):
         data = {
-            "format": "bloompanel/v0.1",
+            "format": "bloompanel/v0.2",
             "project_name": self.project_name.get(),
             "source_path": self.source_path,
             "panels": [asdict(p) for p in self.panels],
             "settings": {k: v.get() for k, v in self.vars.items() if k not in {"recipe"}},
             "recipe": self.vars["recipe"].get(),
         }
-        path = self.project_file()
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        path = self.project_file(); path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         if self.source_path and self.vars["copy_source"].get():
-            asset_folder = self.assets_dir / self.safe_name(self.project_name.get())
-            asset_folder.mkdir(parents=True, exist_ok=True)
+            asset_folder = self.assets_dir / self.safe_name(self.project_name.get()); asset_folder.mkdir(parents=True, exist_ok=True)
             try:
                 shutil.copy2(self.source_path, asset_folder / Path(self.source_path).name)
             except Exception:
                 pass
-        self.status.set(f"Saved project: {path}")
-        self.refresh_recent_projects()
+        self.status.set(f"Saved project: {path}"); self.refresh_recent_projects()
 
     def load_project_dialog(self):
         path = filedialog.askopenfilename(title="Load BloomPanel project", initialdir=self.projects_dir, filetypes=[("BloomPanel project", "*.bloompanel.json"), ("JSON", "*.json")])
@@ -339,16 +347,14 @@ class BloomPanelLab:
 
     def refresh_recent_projects(self):
         self.recent_box.delete(0, tk.END)
-        files = sorted(self.projects_dir.glob("*.bloompanel.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-        for p in files[:12]:
+        for p in sorted(self.projects_dir.glob("*.bloompanel.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:12]:
             self.recent_box.insert(tk.END, p.stem.replace(".bloompanel", ""))
 
     def load_selected_recent(self):
         selection = self.recent_box.curselection()
         if not selection:
             return
-        name = self.recent_box.get(selection[0])
-        path = self.projects_dir / f"{name}.bloompanel.json"
+        path = self.projects_dir / f"{self.recent_box.get(selection[0])}.bloompanel.json"
         if path.exists():
             self.load_project(path)
 
@@ -365,129 +371,97 @@ class BloomPanelLab:
             for k, value in data.get("settings", {}).items():
                 if k in self.vars:
                     self.vars[k].set(value)
-            self.refresh_color_buttons()
-            self.selected_index = 0 if self.panels else None
-            self.status.set(f"Loaded project: {path.name}")
-            self.refresh_all()
-            self.refresh_strip()
+            self.refresh_color_buttons(); self.selected_index = 0 if self.panels else None
+            self.status.set(f"Loaded project: {path.name}"); self.refresh_all(); self.refresh_strip()
         except Exception as error:
             messagebox.showerror(APP_TITLE, f"Could not load project:\n{error}")
 
     def auto_grid(self):
-        if not self.source:
-            return
+        if not self.source: return
         cols, rows = self.vars["grid_cols"].get(), self.vars["grid_rows"].get()
         gx, gy, trim = self.vars["gutter_x"].get(), self.vars["gutter_y"].get(), self.vars["trim"].get()
         w, h = self.source.width - trim * 2, self.source.height - trim * 2
         self.panels.clear()
         for r in range(rows):
             for c in range(cols):
-                x1 = int(trim + c * w / cols + gx / 2)
-                y1 = int(trim + r * h / rows + gy / 2)
-                x2 = int(trim + (c + 1) * w / cols - gx / 2)
-                y2 = int(trim + (r + 1) * h / rows - gy / 2)
+                x1 = int(trim + c * w / cols + gx / 2); y1 = int(trim + r * h / rows + gy / 2)
+                x2 = int(trim + (c + 1) * w / cols - gx / 2); y2 = int(trim + (r + 1) * h / rows - gy / 2)
                 self.panels.append(PanelBox(x1, y1, x2, y2, f"Panel {len(self.panels)+1}"))
-        self.selected_index = 0 if self.panels else None
-        self.refresh_all()
-        self.refresh_strip()
+        self.selected_index = 0 if self.panels else None; self.refresh_all(); self.refresh_strip()
 
     def auto_detect(self):
-        if not self.source:
-            return
+        if not self.source: return
         gray = ImageOps.grayscale(self.source).resize((min(900, self.source.width), min(900, self.source.height)))
-        w, h = gray.size
-        threshold = self.vars["detect_threshold"].get()
-        pix = gray.load()
+        w, h = gray.size; threshold = self.vars["detect_threshold"].get(); pix = gray.load()
         cols = [x for x in range(w) if sum(1 for y in range(h) if pix[x, y] < threshold) > h * 0.72]
         rows = [y for y in range(h) if sum(1 for x in range(w) if pix[x, y] < threshold) > w * 0.72]
         xcuts, ycuts = self.cluster(cols, w), self.cluster(rows, h)
-        sx, sy = self.source.width / w, self.source.height / h
-        trim = self.vars["trim"].get()
-        minimum = self.vars["min_panel"].get()
+        sx, sy = self.source.width / w, self.source.height / h; trim = self.vars["trim"].get(); minimum = self.vars["min_panel"].get()
         found = []
         for y1, y2 in zip(ycuts[:-1], ycuts[1:]):
             for x1, x2 in zip(xcuts[:-1], xcuts[1:]):
                 p = PanelBox(int(x1*sx)+trim, int(y1*sy)+trim, int(x2*sx)-trim, int(y2*sy)-trim, f"Panel {len(found)+1}").normalized()
-                bw, bh = p.size()
-                if bw >= minimum and bh >= minimum:
+                if p.size()[0] >= minimum and p.size()[1] >= minimum:
                     found.append(p)
-        self.panels = found
-        self.selected_index = 0 if found else None
-        self.refresh_all()
-        self.refresh_strip()
+        self.panels = found; self.selected_index = 0 if found else None; self.refresh_all(); self.refresh_strip()
 
     @staticmethod
     def cluster(values, maximum):
-        if not values:
-            return [0, maximum]
-        groups = []
-        a = b = values[0]
+        if not values: return [0, maximum]
+        groups = []; a = b = values[0]
         for v in values[1:]:
-            if v <= b + 2:
-                b = v
-            else:
-                groups.append((a, b)); a = b = v
+            if v <= b + 2: b = v
+            else: groups.append((a, b)); a = b = v
         groups.append((a, b))
         cuts = [0] + [((a+b)//2) for a, b in groups if 10 < ((a+b)//2) < maximum-10] + [maximum]
         return sorted(set(cuts))
 
     def generate_layout(self):
         if not self.source:
-            messagebox.showinfo(APP_TITLE, "Load a source image first.")
-            return
-        kind = self.vars["layout_type"].get()
-        count = self.vars["layout_count"].get()
-        trim = self.vars["trim"].get()
-        W, H = self.source.width - trim * 2, self.source.height - trim * 2
-        X, Y = trim, trim
-        panels: list[PanelBox] = []
+            messagebox.showinfo(APP_TITLE, "Load a source image first."); return
+        kind = self.vars["layout_type"].get(); count = self.vars["layout_count"].get(); trim = self.vars["trim"].get()
+        W, H = self.source.width - trim * 2, self.source.height - trim * 2; X, Y = trim, trim; panels: list[PanelBox] = []
         if kind == "Comic Grid":
-            cols = max(1, round(math.sqrt(count)))
-            rows = math.ceil(count / cols)
+            cols = max(1, round(math.sqrt(count))); rows = math.ceil(count / cols)
             for i in range(count):
                 c, r = i % cols, i // cols
                 panels.append(PanelBox(int(X+c*W/cols+8), int(Y+r*H/rows+8), int(X+(c+1)*W/cols-8), int(Y+(r+1)*H/rows-8), f"Panel {i+1}"))
         elif kind == "Big Hero":
-            panels.append(PanelBox(X, Y, X+int(W*.62), Y+int(H*.62), "Hero"))
-            side_x = X + int(W*.64)
-            for i in range(count-1):
-                y1 = Y + int(i * H/(count-1))
-                y2 = Y + int((i+1) * H/(count-1)) - 8
-                panels.append(PanelBox(side_x, y1, X+W, y2, f"Side {i+1}"))
+            panels.append(PanelBox(X, Y, X+int(W*.62), Y+int(H*.62), "Hero")); side_x = X + int(W*.64)
+            for i in range(count-1): panels.append(PanelBox(side_x, Y + int(i * H/(count-1)), X+W, Y + int((i+1) * H/(count-1)) - 8, f"Side {i+1}"))
         elif kind == "Golden Spiral":
             x, y, w, h = X, Y, W, H
             for i in range(count):
                 if i % 2 == 0:
-                    cut = int(w * .618)
-                    panels.append(PanelBox(x, y, x+cut-8, y+h, f"Spiral {i+1}"))
-                    x += cut; w -= cut
+                    cut = int(w * .618); panels.append(PanelBox(x, y, x+cut-8, y+h, f"Spiral {i+1}")); x += cut; w -= cut
                 else:
-                    cut = int(h * .618)
-                    panels.append(PanelBox(x, y, x+w, y+cut-8, f"Spiral {i+1}"))
-                    y += cut; h -= cut
-                if w < 80 or h < 80:
-                    break
+                    cut = int(h * .618); panels.append(PanelBox(x, y, x+w, y+cut-8, f"Spiral {i+1}")); y += cut; h -= cut
+                if w < 80 or h < 80: break
         elif kind == "Webtoon Stack":
             for i in range(count):
-                y1 = Y + int(i * H / count) + 10
-                y2 = Y + int((i+1) * H / count) - 10
-                inset = 20 + (i % 3) * 18
-                panels.append(PanelBox(X+inset, y1, X+W-inset, y2, f"Stack {i+1}"))
+                inset = 20 + (i % 3) * 18; panels.append(PanelBox(X+inset, Y + int(i * H / count) + 10, X+W-inset, Y + int((i+1) * H / count) - 10, f"Stack {i+1}"))
         else:
             for i in range(count):
-                rw = random.randint(max(80, W//5), max(100, W//2))
-                rh = random.randint(max(80, H//6), max(100, H//3))
-                x1 = random.randint(X, max(X, X+W-rw))
-                y1 = random.randint(Y, max(Y, Y+H-rh))
-                panels.append(PanelBox(x1, y1, x1+rw, y1+rh, f"Chaos {i+1}"))
-        self.panels = panels
-        self.selected_index = 0 if panels else None
-        self.refresh_all(); self.refresh_strip()
+                rw = random.randint(max(80, W//5), max(100, W//2)); rh = random.randint(max(80, H//6), max(100, H//3))
+                x1 = random.randint(X, max(X, X+W-rw)); y1 = random.randint(Y, max(Y, Y+H-rh))
+                if kind == "Broken Glass":
+                    pts = [[x1, y1+random.randint(0, rh//3)], [x1+rw-random.randint(0, rw//4), y1], [x1+rw, y1+rh-random.randint(0, rh//4)], [x1+random.randint(0, rw//3), y1+rh]]
+                    panels.append(self.panel_from_points(pts, f"Shard {i+1}"))
+                else:
+                    panels.append(PanelBox(x1, y1, x1+rw, y1+rh, f"Chaos {i+1}"))
+        self.panels = panels; self.selected_index = 0 if panels else None; self.refresh_all(); self.refresh_strip()
 
     def clear_panels(self):
         self.panels.clear(); self.selected_index = None; self.refresh_all(); self.refresh_strip()
 
+    def clear_selected_sketch(self):
+        if self.selected_index is None or self.selected_index >= len(self.panels): return
+        p = self.panels[self.selected_index]
+        self.panels[self.selected_index] = PanelBox(p.x1, p.y1, p.x2, p.y2, p.name, None)
+        self.refresh_all(); self.refresh_strip()
+
     def canvas_to_image(self, x, y):
+        if self.scale <= 0: return 0, 0
         return int((x - self.offset_x) / self.scale), int((y - self.offset_y) / self.scale)
 
     def image_to_canvas(self, x, y):
@@ -502,34 +476,77 @@ class BloomPanelLab:
         return None
 
     def on_down(self, event):
-        if not self.source:
+        if not self.source: return
+        tool = self.vars["tool"].get()
+        if tool == "Select":
+            hit = self.panel_at(event.x, event.y)
+            if hit is not None:
+                self.selected_index = hit; self.refresh_all(); self.refresh_strip()
             return
         hit = self.panel_at(event.x, event.y)
-        if hit is not None:
+        if hit is not None and tool == "Rectangle Panel":
             self.selected_index = hit; self.refresh_all(); self.refresh_strip(); return
         self.drag_start = (event.x, event.y)
+        self.sketch_points_canvas = [(event.x, event.y)]
         self.canvas.delete("temp")
 
     def on_drag(self, event):
-        if not self.drag_start:
-            return
-        self.canvas.delete("temp")
-        x, y = self.drag_start
-        self.canvas.create_rectangle(x, y, event.x, event.y, outline="#63f6ff", width=3, dash=(6, 4), tags="temp")
+        if not self.drag_start: return
+        tool = self.vars["tool"].get()
+        if tool == "Sketch Panel":
+            last = self.sketch_points_canvas[-1]
+            if abs(event.x - last[0]) + abs(event.y - last[1]) >= 3:
+                self.sketch_points_canvas.append((event.x, event.y))
+                self.canvas.create_line(last[0], last[1], event.x, event.y, fill="#fff36d", width=max(1, self.vars["sketch_width"].get()), tags="temp", capstyle=tk.ROUND, smooth=True)
+        else:
+            self.canvas.delete("temp"); x, y = self.drag_start
+            self.canvas.create_rectangle(x, y, event.x, event.y, outline="#63f6ff", width=3, dash=(6, 4), tags="temp")
 
     def on_up(self, event):
-        if not self.source or not self.drag_start:
-            return
-        x0, y0 = self.drag_start
-        x1, y1 = self.canvas_to_image(x0, y0)
-        x2, y2 = self.canvas_to_image(event.x, event.y)
-        p = PanelBox(x1, y1, x2, y2, f"Panel {len(self.panels)+1}").normalized()
-        p.x1 = max(0, min(self.source.width, p.x1)); p.x2 = max(0, min(self.source.width, p.x2))
-        p.y1 = max(0, min(self.source.height, p.y1)); p.y2 = max(0, min(self.source.height, p.y2))
-        if p.size()[0] > 30 and p.size()[1] > 30:
-            self.panels.append(p); self.selected_index = len(self.panels)-1
-        self.drag_start = None
-        self.refresh_all(); self.refresh_strip()
+        if not self.source or not self.drag_start: return
+        tool = self.vars["tool"].get()
+        if tool == "Sketch Panel":
+            self.sketch_points_canvas.append((event.x, event.y))
+            image_points = [list(self.canvas_to_image(x, y)) for x, y in self.sketch_points_canvas]
+            image_points = self.clean_points(image_points)
+            if len(image_points) >= 3:
+                p = self.panel_from_points(image_points, f"Sketch {len(self.panels)+1}")
+                if p.size()[0] > 30 and p.size()[1] > 30:
+                    self.panels.append(p); self.selected_index = len(self.panels)-1
+        else:
+            x0, y0 = self.drag_start; x1, y1 = self.canvas_to_image(x0, y0); x2, y2 = self.canvas_to_image(event.x, event.y)
+            p = PanelBox(x1, y1, x2, y2, f"Panel {len(self.panels)+1}").normalized()
+            p.x1 = max(0, min(self.source.width, p.x1)); p.x2 = max(0, min(self.source.width, p.x2)); p.y1 = max(0, min(self.source.height, p.y1)); p.y2 = max(0, min(self.source.height, p.y2))
+            if p.size()[0] > 30 and p.size()[1] > 30:
+                self.panels.append(p); self.selected_index = len(self.panels)-1
+        self.drag_start = None; self.sketch_points_canvas = []; self.canvas.delete("temp"); self.refresh_all(); self.refresh_strip()
+
+    def clean_points(self, points: list[list[int]]) -> list[list[int]]:
+        if not points: return []
+        simplify = max(1, self.vars["sketch_simplify"].get())
+        filtered = []
+        for p in points:
+            if not filtered or abs(p[0]-filtered[-1][0]) + abs(p[1]-filtered[-1][1]) >= simplify:
+                filtered.append(p)
+        smooth = self.vars["sketch_smooth"].get()
+        if smooth > 0 and len(filtered) > 4:
+            rounds = max(1, smooth // 30)
+            for _ in range(rounds):
+                new = [filtered[0]]
+                for i in range(1, len(filtered)-1):
+                    x = int((filtered[i-1][0] + filtered[i][0]*2 + filtered[i+1][0]) / 4)
+                    y = int((filtered[i-1][1] + filtered[i][1]*2 + filtered[i+1][1]) / 4)
+                    new.append([x, y])
+                new.append(filtered[-1]); filtered = new
+        if self.vars["auto_close"].get() and filtered[0] != filtered[-1]:
+            filtered.append(filtered[0])
+        return filtered
+
+    def panel_from_points(self, points: list[list[int]], name: str) -> PanelBox:
+        xs = [p[0] for p in points]; ys = [p[1] for p in points]
+        x1 = max(0, min(xs)); y1 = max(0, min(ys)); x2 = min(self.source.width, max(xs)); y2 = min(self.source.height, max(ys))
+        clipped = [[max(0, min(self.source.width, p[0])), max(0, min(self.source.height, p[1]))] for p in points]
+        return PanelBox(x1, y1, x2, y2, name, clipped)
 
     def delete_panel_at(self, event):
         hit = self.panel_at(event.x, event.y)
@@ -539,7 +556,7 @@ class BloomPanelLab:
     def redraw_canvas(self):
         self.canvas.delete("all")
         if not self.source:
-            self.canvas.create_text(self.canvas.winfo_width()//2, self.canvas.winfo_height()//2, text="LOAD SOURCE\nthen draw panels, detect gutters, or generate layouts", fill="#77778c", font=("TkDefaultFont", 22, "bold"), justify=tk.CENTER)
+            self.canvas.create_text(self.canvas.winfo_width()//2, self.canvas.winfo_height()//2, text="LOAD SOURCE\nthen draw rectangles, sketch masks, detect gutters, or generate layouts", fill="#77778c", font=("TkDefaultFont", 22, "bold"), justify=tk.CENTER)
             return
         cw, ch = max(1, self.canvas.winfo_width()), max(1, self.canvas.winfo_height())
         self.scale = min((cw-30)/self.source.width, (ch-30)/self.source.height, 1.0)
@@ -548,12 +565,18 @@ class BloomPanelLab:
         self.preview_photo = ImageTk.PhotoImage(preview)
         self.canvas.create_image(self.offset_x, self.offset_y, image=self.preview_photo, anchor="nw")
         for i, p in enumerate(self.panels):
-            b = p.normalized(); x1, y1 = self.image_to_canvas(b.x1, b.y1); x2, y2 = self.image_to_canvas(b.x2, b.y2)
-            color = "#fff36d" if i == self.selected_index else "#63f6ff"
-            self.canvas.create_rectangle(x1, y1, x2, y2, outline=color, width=3)
-            self.canvas.create_rectangle(x1, y1, x1+64, y1+25, fill="#000", outline=color)
-            self.canvas.create_text(x1+32, y1+12, text=str(i+1), fill=color, font=("TkDefaultFont", 11, "bold"))
-        self.status.set(f"{len(self.panels)} panels | {self.project_name.get()} | {self.workspace}")
+            b = p.normalized(); color = "#fff36d" if i == self.selected_index else "#63f6ff"
+            if p.is_sketch():
+                pts = [self.image_to_canvas(x, y) for x, y in p.points]
+                flat = [n for point in pts for n in point]
+                self.canvas.create_polygon(flat, outline=color, fill="", width=3, smooth=True)
+                lx, ly = pts[0]
+            else:
+                x1, y1 = self.image_to_canvas(b.x1, b.y1); x2, y2 = self.image_to_canvas(b.x2, b.y2)
+                self.canvas.create_rectangle(x1, y1, x2, y2, outline=color, width=3); lx, ly = x1, y1
+            self.canvas.create_rectangle(lx, ly, lx+64, ly+25, fill="#000", outline=color)
+            self.canvas.create_text(lx+32, ly+12, text=str(i+1), fill=color, font=("TkDefaultFont", 11, "bold"))
+        self.status.set(f"{len(self.panels)} panels | {self.project_name.get()} | Tool: {self.vars['tool'].get()}")
 
     def refresh_strip(self):
         for child in self.strip_inner.winfo_children(): child.destroy()
@@ -561,12 +584,13 @@ class BloomPanelLab:
         if not self.source or not self.panels:
             tk.Label(self.strip_inner, text="No panels yet.", bg="#14141d", fg="#aaaabb").pack(padx=10, pady=10); return
         for i, p in enumerate(self.panels):
-            crop = self.source.crop(self.clamp(p)); crop.thumbnail((185, 105), Image.Resampling.LANCZOS)
+            crop = self.render_panel_crop(p, transparent=False); crop.thumbnail((185, 105), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(crop); self.thumb_photos.append(photo)
             bg = "#34344a" if i == self.selected_index else "#20202c"
             card = tk.Frame(self.strip_inner, bg=bg, padx=5, pady=5); card.pack(fill=tk.X, padx=8, pady=5)
             tk.Label(card, image=photo, bg=bg).pack(side=tk.LEFT)
-            tk.Button(card, text=f"{i+1:02d}\n{p.size()[0]}×{p.size()[1]}", command=lambda n=i: self.select_panel(n), bg=bg, fg="white", relief=tk.FLAT).pack(side=tk.LEFT, padx=8)
+            kind = "SKETCH" if p.is_sketch() else "RECT"
+            tk.Button(card, text=f"{i+1:02d} {kind}\n{p.size()[0]}×{p.size()[1]}", command=lambda n=i: self.select_panel(n), bg=bg, fg="white", relief=tk.FLAT, justify=tk.LEFT).pack(side=tk.LEFT, padx=8)
 
     def select_panel(self, i):
         self.selected_index = i; self.refresh_all(); self.refresh_strip()
@@ -574,22 +598,46 @@ class BloomPanelLab:
     def refresh_selected_preview(self):
         self.preview_canvas.delete("all")
         if not self.source or self.selected_index is None or self.selected_index >= len(self.panels):
-            self.preview_canvas.create_text(150, 125, text="Select panel", fill="#77778c", font=("TkDefaultFont", 14, "bold")); return
-        crop = self.source.crop(self.clamp(self.panels[self.selected_index]))
-        img = self.frame_image(crop, self.selected_index)
-        img.thumbnail((295, 245), Image.Resampling.LANCZOS)
+            self.preview_canvas.create_text(160, 135, text="Select panel", fill="#77778c", font=("TkDefaultFont", 14, "bold")); return
+        img = self.frame_panel(self.panels[self.selected_index], self.selected_index)
+        img.thumbnail((315, 265), Image.Resampling.LANCZOS)
         self.selected_photo = ImageTk.PhotoImage(img)
-        self.preview_canvas.create_image(150, 130, image=self.selected_photo, anchor="center")
+        self.preview_canvas.create_image(160, 140, image=self.selected_photo, anchor="center")
 
     def clamp(self, p):
         b = p.normalized()
         return (max(0, min(self.source.width, b.x1)), max(0, min(self.source.height, b.y1)), max(0, min(self.source.width, b.x2)), max(0, min(self.source.height, b.y2)))
 
+    def render_panel_crop(self, panel: PanelBox, transparent=True) -> Image.Image:
+        crop = self.source.crop(self.clamp(panel)).convert("RGBA")
+        if panel.is_sketch() and self.vars["clip_to_sketch"].get():
+            b = panel.normalized()
+            relative = [(x - b.x1, y - b.y1) for x, y in panel.points]
+            mask = Image.new("L", crop.size, 0)
+            draw = ImageDraw.Draw(mask)
+            draw.polygon(relative, fill=255)
+            feather = self.vars["mask_feather"].get()
+            if feather > 0:
+                mask = mask.filter(ImageFilter.GaussianBlur(feather))
+            crop.putalpha(mask)
+            outline = Image.new("RGBA", crop.size, (0, 0, 0, 0))
+            od = ImageDraw.Draw(outline)
+            wobble = self.vars["sketch_wobble"].get()
+            line_points = relative
+            for offset in range(max(1, self.vars["sketch_width"].get() // 3)):
+                jittered = [(x + random.randint(-wobble, wobble), y + random.randint(-wobble, wobble)) for x, y in line_points]
+                od.line(jittered, fill=(0, 0, 0, 200), width=max(1, self.vars["sketch_width"].get()), joint="curve")
+            crop = Image.alpha_composite(crop, outline)
+        elif not transparent:
+            bg = Image.new("RGBA", crop.size, "#101018")
+            bg.alpha_composite(crop)
+            crop = bg
+        return crop
+
     def export_pack(self):
         if not self.source or not self.panels:
             messagebox.showinfo(APP_TITLE, "Load source and create panels first."); return
-        project = self.safe_name(self.project_name.get())
-        folder = self.exports_dir / project
+        project = self.safe_name(self.project_name.get()); folder = self.exports_dir / project
         if folder.exists() and not self.vars["overwrite_pack"].get():
             n = 2
             while (self.exports_dir / f"{project}_{n:02d}").exists(): n += 1
@@ -599,18 +647,15 @@ class BloomPanelLab:
             for old in folder.glob("*.png"): old.unlink()
         exported = []
         for i, p in enumerate(self.panels):
-            crop = self.source.crop(self.clamp(p))
-            framed = self.frame_image(crop, i)
-            path = folder / f"panel_{i+1:02d}.png"
-            framed.save(path)
-            exported.append((i, framed.copy()))
-        if self.vars["contact_sheet"].get():
-            self.make_contact_sheet(exported).save(folder / "_CONTACT_SHEET.png")
-        manifest = {"project": self.project_name.get(), "source": self.source_path, "count": len(exported), "recipe": self.vars["recipe"].get()}
+            framed = self.frame_panel(p, i)
+            path = folder / f"panel_{i+1:02d}.png"; framed.save(path); exported.append((i, framed.copy()))
+        if self.vars["contact_sheet"].get(): self.make_contact_sheet(exported).save(folder / "_CONTACT_SHEET.png")
+        manifest = {"project": self.project_name.get(), "source": self.source_path, "count": len(exported), "recipe": self.vars["recipe"].get(), "sketch_panels": sum(1 for p in self.panels if p.is_sketch())}
         (folder / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        self.last_export = folder
-        self.save_project()
-        messagebox.showinfo(APP_TITLE, f"Exported pack:\n{folder}")
+        self.last_export = folder; self.save_project(); messagebox.showinfo(APP_TITLE, f"Exported pack:\n{folder}")
+
+    def frame_panel(self, panel: PanelBox, index: int) -> Image.Image:
+        return self.frame_image(self.render_panel_crop(panel, transparent=True), index)
 
     def frame_image(self, image: Image.Image, index: int):
         recipe_name = self.vars["recipe"].get()
@@ -623,7 +668,7 @@ class BloomPanelLab:
         image = self.add_texture(image, recipe["outer"], recipe["texture"])
         image = self.add_bevel(image, recipe["bevel"])
         if self.vars["number_labels"].get(): image = self.add_label(image, index+1)
-        if recipe["radius"] > 0: image = self.rounded(image, recipe["radius"])
+        if recipe["radius"] > 0 and not self.panels[index].is_sketch(): image = self.rounded(image, recipe["radius"])
         return self.shadow_glow(image, recipe["shadow"], recipe["glow"], recipe["glow_color"])
 
     def collect_current_recipe(self):
