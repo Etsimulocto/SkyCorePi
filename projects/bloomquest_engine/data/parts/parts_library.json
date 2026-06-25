@@ -1,5 +1,5 @@
 {
-  "format": "bloomquest/parts-v0.2",
+  "format": "bloomquest/parts-v0.3",
   "tile_size": 32,
   "parts": [
     {"id":"grass","emoji":"","name":"Grass","description":"Basic walkable grass tile.","layer":"map","color":[72,140,72],"solid":false},
@@ -18,7 +18,10 @@
     {"id":"coin","emoji":"🪙","name":"Coin","description":"Adds 1 to the coin counter.","layer":"scene_objects","color":[240,200,60],"solid":false,"action":{"trigger":"player_touch","type":"add_counter","counter":"coins","amount":1,"destroy_self":true}},
     {"id":"heart","emoji":"❤️","name":"Heart","description":"Restores 1 health.","layer":"scene_objects","color":[220,60,70],"solid":false,"action":{"trigger":"player_touch","type":"add_counter","counter":"health","amount":1,"destroy_self":true}},
     {"id":"key","emoji":"🗝️","name":"Key","description":"Adds 1 key.","layer":"scene_objects","color":[225,195,80],"solid":false,"action":{"trigger":"player_touch","type":"add_counter","counter":"keys","amount":1,"destroy_self":true}},
-    {"id":"sword","emoji":"🗡️","name":"Orbit Sword","description":"Place this weapon anywhere in the room to equip the player with a spinning sword.","layer":"weapons","color":[210,210,220],"solid":false,"damage":1,"weapon":{"type":"orbit","radius":1,"speed_ms":120}},
+    {"id":"sword","emoji":"🗡️","name":"Orbit Sword","description":"Equips a sword that spins around the player.","layer":"weapons","color":[210,210,220],"solid":false,"damage":1,"weapon":{"type":"orbit","radius":1,"speed_ms":120,"cooldown_ms":0}},
+    {"id":"bow","emoji":"🏹","name":"Bow","description":"Fires arrows in the direction the player faces.","layer":"weapons","color":[170,120,70],"solid":false,"damage":1,"weapon":{"type":"projectile","projectile_emoji":"➶","speed_ms":90,"range":10,"cooldown_ms":350}},
+    {"id":"wand","emoji":"🪄","name":"Magic Wand","description":"Fires magic bolts through the room.","layer":"weapons","color":[150,100,220],"solid":false,"damage":2,"weapon":{"type":"projectile","projectile_emoji":"✨","speed_ms":70,"range":8,"cooldown_ms":500}},
+    {"id":"bomb","emoji":"💣","name":"Bombs","description":"Drops a bomb that explodes after a short fuse.","layer":"weapons","color":[70,70,75],"solid":false,"damage":3,"weapon":{"type":"bomb","fuse_ms":1200,"radius":1,"cooldown_ms":900}},
     {"id":"sparkle","emoji":"✨","name":"Sparkle","description":"Simple visual effect.","layer":"weapons_effects","color":[240,230,120],"solid":false},
     {"id":"explosion","emoji":"💥","name":"Explosion","description":"Simple explosion effect.","layer":"weapons_effects","color":[240,120,45],"solid":false},
     {"id":"timer","emoji":"⏱️","name":"Timer","description":"Runs an action after a delay.","layer":"weapons_effects","color":[180,200,220],"solid":false,"action":{"trigger":"timer","seconds":5,"type":"show_text","text":"Timer finished!"}}
