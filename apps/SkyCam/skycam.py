@@ -1,8 +1,8 @@
 # skycam.py
 # run with: python3 ~/SkyCam/skycam.py
 # path: /home/quarterbitgames/SkyCam/skycam.py
-# description: BloomCore SkyCam. Auto camera reconnect. Clipboard works on X11 or Wayland.
-# version: 1.5
+# description: BloomCore SkyCam tuned for Arducam 8MP USB Camera.
+# version: 1.6
 # format: bloomcore/v1.3
 
 import cv2, subprocess, tempfile, os, time, shutil, tkinter as tk
@@ -24,16 +24,6 @@ rotation=0
 digital_zoom=1.0
 video_photo=None
 video_item=None
-
-FOCUS_MIN=0
-FOCUS_MAX=255
-FOCUS_STEP=10
-FOCUS_FINE_STEP=2
-PCB_COARSE_STEP=20
-PCB_FINE_RADIUS=18
-PCB_FINE_STEP=2
-focus_value=None
-pcb_scan_running=False
 
 
 def set_status(text, good=True):
@@ -70,7 +60,8 @@ def run_v4l2(args, capture=False):
 
 
 def set_ctrl(name,value):
-    run_v4l2(["--set-ctrl",f"{name}={value}"])
+    result=run_v4l2(["--set-ctrl",f"{name}={int(value)}"],capture=True)
+    return result.returncode == 0
 
 
 def get_ctrl(name):
@@ -84,18 +75,21 @@ def get_ctrl(name):
         return None
 
 
-def sync_focus():
-    global focus_value
-    current=get_ctrl("focus_absolute")
-    if current is not None:
-        focus_value=max(FOCUS_MIN,min(FOCUS_MAX,current))
-    elif focus_value is None:
-        focus_value=(FOCUS_MIN+FOCUS_MAX)//2
-    return focus_value
+def adjust_ctrl(name,delta,minimum,maximum,label):
+    value=get_ctrl(name)
+    if value is None:
+        set_status(f"{label} unavailable",False)
+        return
+    value=max(minimum,min(maximum,value+delta))
+    if not set_ctrl(name,value):
+        set_status(f"Could not set {label}",False)
+        return
+    actual=get_ctrl(name)
+    set_status(f"{label}: {actual if actual is not None else value}",True)
 
 
 def connect_camera():
-    global cap,focus_value
+    global cap
     try:
         if cap is not None:
             cap.release()
@@ -107,20 +101,16 @@ def connect_camera():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,HEIGHT)
     cap.set(cv2.CAP_PROP_FPS,FPS)
-    opened=cap.isOpened()
-    if opened:
-        focus_value=None
-        sync_focus()
-    return opened
+    return cap.isOpened()
 
 
 root=tk.Tk()
-root.title("🌸 SkyCam")
+root.title("🌸 SkyCam — Arducam 8MP")
 root.geometry("1000x760")
 root.minsize(900,650)
 root.configure(bg=BG)
 
-# Hard split: camera gets all flexible space; the control dock is fixed.
+# Camera canvas takes every spare pixel. Controls live in a fixed dock.
 root.grid_rowconfigure(0,weight=1)
 root.grid_rowconfigure(1,weight=0,minsize=154)
 root.grid_columnconfigure(0,weight=1)
@@ -128,8 +118,6 @@ root.grid_columnconfigure(0,weight=1)
 video=tk.Canvas(root,bg=BG,highlightthickness=0,bd=0)
 video.grid(row=0,column=0,sticky="nsew",padx=6,pady=(6,2))
 
-# One fixed-height dock owns status + every button. It cannot be pushed,
-# reflowed, or resized by the live camera image.
 dock=tk.Frame(root,bg=BG,height=154)
 dock.grid(row=1,column=0,sticky="ew",padx=6,pady=(2,6))
 dock.grid_propagate(False)
@@ -225,126 +213,76 @@ def pin_toggle():
     set_status("Pinned on top 📌" if not current else "Unpinned",True)
 
 
-def focus_auto():
-    global focus_value
-    set_ctrl("focus_automatic_continuous",1)
-    focus_value=None
-    set_status("Autofocus ON 🎯",True)
+def normal_preset():
+    # Arducam-reported defaults from this camera.
+    set_ctrl("auto_exposure",3)
+    set_ctrl("brightness",128)
+    set_ctrl("contrast",34)
+    set_ctrl("sharpness",38)
+    set_ctrl("gain",0)
+    set_ctrl("white_balance_automatic",1)
+    set_ctrl("power_line_frequency",2)
+    set_status("NORMAL preset — camera defaults + 60 Hz",True)
 
 
-def manual_focus_delta(delta,label):
-    global focus_value
-    sync_focus()
-    set_ctrl("focus_automatic_continuous",0)
-    focus_value=max(FOCUS_MIN,min(FOCUS_MAX,focus_value+delta))
-    set_ctrl("focus_absolute",focus_value)
-    actual=get_ctrl("focus_absolute")
-    if actual is not None:
-        focus_value=actual
-    set_status(f"{label}: {focus_value}",True)
+def pcb_preset():
+    # Conservative bench preset: preserve auto exposure, add contrast/detail,
+    # avoid electronic gain noise, and use US 60 Hz anti-flicker.
+    set_ctrl("auto_exposure",3)
+    set_ctrl("brightness",128)
+    set_ctrl("contrast",55)
+    set_ctrl("sharpness",90)
+    set_ctrl("gain",0)
+    set_ctrl("white_balance_automatic",1)
+    set_ctrl("power_line_frequency",2)
+    set_status("PCB preset — contrast 55 | sharpness 90 | gain 0",True)
 
 
-def focus_near():
-    manual_focus_delta(-FOCUS_STEP,"Focus near")
+def brightness_down(): adjust_ctrl("brightness",-5,0,255,"Brightness")
+def brightness_up(): adjust_ctrl("brightness",5,0,255,"Brightness")
+def contrast_down(): adjust_ctrl("contrast",-5,0,255,"Contrast")
+def contrast_up(): adjust_ctrl("contrast",5,0,255,"Contrast")
+def sharpness_down(): adjust_ctrl("sharpness",-10,0,255,"Sharpness")
+def sharpness_up(): adjust_ctrl("sharpness",10,0,255,"Sharpness")
+def gain_down(): adjust_ctrl("gain",-5,0,255,"Gain")
+def gain_up(): adjust_ctrl("gain",5,0,255,"Gain")
 
 
-def focus_far():
-    manual_focus_delta(FOCUS_STEP,"Focus far")
+def exposure_auto():
+    if set_ctrl("auto_exposure",3):
+        set_status("Exposure: AUTO",True)
+    else:
+        set_status("Could not enable auto exposure",False)
 
 
-def focus_near_fine():
-    manual_focus_delta(-FOCUS_FINE_STEP,"Fine near")
-
-
-def focus_far_fine():
-    manual_focus_delta(FOCUS_FINE_STEP,"Fine far")
-
-
-def focus_macro():
-    global focus_value
-    set_ctrl("focus_automatic_continuous",0)
-    focus_value=FOCUS_MIN
-    set_ctrl("focus_absolute",focus_value)
-    actual=get_ctrl("focus_absolute")
-    if actual is not None:
-        focus_value=actual
-    set_status(f"PCB / MACRO focus: {focus_value} — use fine focus if needed",True)
-
-
-def focus_read():
-    value=sync_focus()
-    set_status(f"Current focus: {value}",True)
-
-
-def sharpness_score(frame):
-    if frame is None:
-        return -1.0
-    h,w=frame.shape[:2]
-    x1,x2=int(w*0.20),int(w*0.80)
-    y1,y2=int(h*0.20),int(h*0.80)
-    roi=frame[y1:y2,x1:x2]
-    gray=cv2.cvtColor(roi,cv2.COLOR_BGR2GRAY)
-    return float(cv2.Laplacian(gray,cv2.CV_64F).var())
-
-
-def grab_focus_frame(settle_frames=3):
-    frame=None
-    if cap is None:
-        return None
-    for _ in range(settle_frames):
-        ok,frame=cap.read()
-        if not ok:
-            return None
-    return frame
-
-
-def pcb_autofocus():
-    global focus_value,pcb_scan_running
-    if pcb_scan_running:
+def exposure_adjust(delta):
+    # exposure_time_absolute is inactive until Manual Mode is selected.
+    set_ctrl("auto_exposure",1)
+    value=get_ctrl("exposure_time_absolute")
+    if value is None:
+        set_status("Manual exposure unavailable",False)
         return
-    if cap is None or not cap.isOpened():
-        set_status("Camera not ready",False)
-        return
+    value=max(3,min(2047,value+delta))
+    if set_ctrl("exposure_time_absolute",value):
+        actual=get_ctrl("exposure_time_absolute")
+        set_status(f"Exposure MANUAL: {actual if actual is not None else value}",True)
+    else:
+        set_status("Could not set manual exposure",False)
 
-    pcb_scan_running=True
-    set_ctrl("focus_automatic_continuous",0)
-    set_status("PCB AUTO: scanning focus...",True)
-    root.update_idletasks()
 
-    best_value=None
-    best_score=-1.0
+def exposure_down(): exposure_adjust(-20)
+def exposure_up(): exposure_adjust(20)
 
-    for value in range(FOCUS_MIN,FOCUS_MAX+1,PCB_COARSE_STEP):
-        set_ctrl("focus_absolute",value)
-        time.sleep(0.04)
-        frame=grab_focus_frame(3)
-        score=sharpness_score(frame)
-        if score>best_score:
-            best_score=score
-            best_value=value
 
-    if best_value is None:
-        pcb_scan_running=False
-        set_status("PCB AUTO could not read a sharp frame",False)
-        return
-
-    fine_start=max(FOCUS_MIN,best_value-PCB_FINE_RADIUS)
-    fine_end=min(FOCUS_MAX,best_value+PCB_FINE_RADIUS)
-    for value in range(fine_start,fine_end+1,PCB_FINE_STEP):
-        set_ctrl("focus_absolute",value)
-        time.sleep(0.03)
-        frame=grab_focus_frame(2)
-        score=sharpness_score(frame)
-        if score>best_score:
-            best_score=score
-            best_value=value
-
-    set_ctrl("focus_absolute",best_value)
-    time.sleep(0.05)
-    actual=get_ctrl("focus_absolute")
-    focus_value=actual if actual is not None else best_value
-    pcb_scan_running=False
-    set_status(f"PCB AUTO locked focus: {focus_value} | sharpness {best_score:.0f}",True)
+def camera_info():
+    values=[]
+    for label,name in (("B","brightness"),("C","contrast"),("S","sharpness"),("G","gain")):
+        value=get_ctrl(name)
+        if value is not None:
+            values.append(f"{label}:{value}")
+    ae=get_ctrl("auto_exposure")
+    values.append("EXP:AUTO" if ae==3 else "EXP:MAN")
+    set_status(" | ".join(values),True)
 
 
 setup_equal_columns(bar1,7)
@@ -356,17 +294,24 @@ button(bar1,"ZOOM +",zoom_in,4)
 button(bar1,"ZOOM -",zoom_out,5)
 button(bar1,"PIN",pin_toggle,6)
 
-setup_equal_columns(bar2,5)
-button(bar2,"AUTO FOCUS",focus_auto,0)
-button(bar2,"PCB AUTO",pcb_autofocus,1)
-button(bar2,"MACRO",focus_macro,2)
-button(bar2,"NEAR",focus_near,3)
-button(bar2,"FAR",focus_far,4)
+setup_equal_columns(bar2,8)
+button(bar2,"PCB",pcb_preset,0)
+button(bar2,"NORMAL",normal_preset,1)
+button(bar2,"BRIGHT -",brightness_down,2)
+button(bar2,"BRIGHT +",brightness_up,3)
+button(bar2,"CONTRAST -",contrast_down,4)
+button(bar2,"CONTRAST +",contrast_up,5)
+button(bar2,"SHARP -",sharpness_down,6)
+button(bar2,"SHARP +",sharpness_up,7)
 
-setup_equal_columns(bar3,3)
-button(bar3,"FINE <",focus_near_fine,0)
-button(bar3,"FOCUS #",focus_read,1)
-button(bar3,"FINE >",focus_far_fine,2)
+setup_equal_columns(bar3,7)
+button(bar3,"EXP AUTO",exposure_auto,0)
+button(bar3,"EXP -",exposure_down,1)
+button(bar3,"EXP +",exposure_up,2)
+button(bar3,"GAIN -",gain_down,3)
+button(bar3,"GAIN +",gain_up,4)
+button(bar3,"INFO",camera_info,5)
+button(bar3,"RESET",normal_preset,6)
 
 
 def render_to_canvas(frame):
@@ -396,10 +341,6 @@ def render_to_canvas(frame):
 
 def update_frame():
     global cap,last_frame
-    if pcb_scan_running:
-        root.after(50,update_frame)
-        return
-
     ret=False; frame=None
     if cap is not None:
         try: ret,frame=cap.read()
