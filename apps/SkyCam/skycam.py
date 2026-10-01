@@ -2,7 +2,7 @@
 # run with: python3 ~/SkyCam/skycam.py
 # path: /home/quarterbitgames/SkyCam/skycam.py
 # description: BloomCore SkyCam. Auto camera reconnect. Clipboard works on X11 or Wayland.
-# version: 1.4
+# version: 1.5
 # format: bloomcore/v1.3
 
 import cv2, subprocess, tempfile, os, time, shutil, tkinter as tk
@@ -25,8 +25,6 @@ digital_zoom=1.0
 video_photo=None
 video_item=None
 
-# Most UVC autofocus webcams expose focus_absolute on a 0..255 scale.
-# Lower values are nearer focus on the camera currently used with SkyCam.
 FOCUS_MIN=0
 FOCUS_MAX=255
 FOCUS_STEP=10
@@ -118,45 +116,49 @@ def connect_camera():
 
 root=tk.Tk()
 root.title("🌸 SkyCam")
-root.geometry("960x680")
-root.minsize(760,520)
+root.geometry("1000x760")
+root.minsize(900,650)
 root.configure(bg=BG)
 
-# The canvas owns all flexible space. A Canvas does not request the size of
-# the displayed camera frame, so the camera image can no longer resize the
-# application window or push the controls off-screen.
+# Hard split: camera gets all flexible space; the control dock is fixed.
 root.grid_rowconfigure(0,weight=1)
-for row in (1,2,3,4):
-    root.grid_rowconfigure(row,weight=0)
+root.grid_rowconfigure(1,weight=0,minsize=154)
 root.grid_columnconfigure(0,weight=1)
 
 video=tk.Canvas(root,bg=BG,highlightthickness=0,bd=0)
 video.grid(row=0,column=0,sticky="nsew",padx=6,pady=(6,2))
 
-status=tk.Label(root,text="Starting SkyCam...",font=("Arial",10,"bold"),bg=BG,fg=WARN,
-                anchor="w",padx=8,pady=3)
-status.grid(row=1,column=0,sticky="ew",padx=6,pady=(1,1))
+# One fixed-height dock owns status + every button. It cannot be pushed,
+# reflowed, or resized by the live camera image.
+dock=tk.Frame(root,bg=BG,height=154)
+dock.grid(row=1,column=0,sticky="ew",padx=6,pady=(2,6))
+dock.grid_propagate(False)
+dock.grid_columnconfigure(0,weight=1)
+for r in range(4):
+    dock.grid_rowconfigure(r,weight=0)
 
-bar1=tk.Frame(root,bg=BG,height=36)
-bar2=tk.Frame(root,bg=BG,height=36)
-bar3=tk.Frame(root,bg=BG,height=36)
-for bar in (bar1,bar2,bar3):
+status=tk.Label(dock,text="Starting SkyCam...",font=("Arial",10,"bold"),bg=BG,fg=WARN,
+                anchor="w",padx=8,pady=2,height=1)
+status.grid(row=0,column=0,sticky="ew",pady=(0,2))
+
+bar1=tk.Frame(dock,bg=BG,height=38)
+bar2=tk.Frame(dock,bg=BG,height=38)
+bar3=tk.Frame(dock,bg=BG,height=38)
+for bar,row in ((bar1,1),(bar2,2),(bar3,3)):
+    bar.grid(row=row,column=0,sticky="ew",pady=1)
     bar.grid_propagate(False)
-bar1.grid(row=2,column=0,sticky="ew",padx=6,pady=1)
-bar2.grid(row=3,column=0,sticky="ew",padx=6,pady=1)
-bar3.grid(row=4,column=0,sticky="ew",padx=6,pady=(1,5))
+    bar.grid_rowconfigure(0,weight=1)
 
 
 def setup_equal_columns(frame,count):
     for col in range(count):
         frame.grid_columnconfigure(col,weight=1,uniform=f"{id(frame)}cols")
-    frame.grid_rowconfigure(0,weight=1)
 
 
 def button(parent,text,command,column):
     b=tk.Button(parent,text=text,font=("Arial",9,"bold"),command=command,
                 bg=BTN_BG,fg=FG,activebackground=ACTIVE,activeforeground=FG,
-                relief="flat",bd=0,padx=3,pady=3)
+                relief="flat",bd=0,padx=2,pady=2)
     b.grid(row=0,column=column,sticky="nsew",padx=2,pady=1)
     return b
 
