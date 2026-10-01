@@ -2,7 +2,7 @@
 # run with: python3 ~/SkyCam/skycam.py
 # path: /home/quarterbitgames/SkyCam/skycam.py
 # description: BloomCore SkyCam. Auto camera reconnect. Clipboard works on X11 or Wayland.
-# version: 1.2
+# version: 1.3
 # format: bloomcore/v1.3
 
 import cv2, subprocess, tempfile, os, time, shutil, tkinter as tk
@@ -116,26 +116,44 @@ def connect_camera():
 
 root=tk.Tk()
 root.title("🌸 SkyCam")
-root.geometry("980x760")
-root.minsize(520,460)
+root.geometry("1040x780")
+root.minsize(760,560)
 root.configure(bg=BG)
 
-video=tk.Label(root,bg=BG)
-video.pack(fill="both",expand=True,padx=6,pady=6)
+# Stable responsive layout:
+# - row 0 (video) gets ALL extra width/height
+# - rows 1-4 (status + controls) keep their natural height
+# - controls use fixed grid rows instead of pack reflow
+root.grid_rowconfigure(0,weight=1)
+for row in (1,2,3,4):
+    root.grid_rowconfigure(row,weight=0)
+root.grid_columnconfigure(0,weight=1)
 
-status=tk.Label(root,text="Starting SkyCam...",font=("Arial",12,"bold"),bg=BG,fg=WARN)
-status.pack(fill="x",padx=6,pady=4)
+video=tk.Label(root,bg=BG,anchor="center")
+video.grid(row=0,column=0,sticky="nsew",padx=6,pady=(6,2))
 
-bar1=tk.Frame(root,bg=BG); bar1.pack(fill="x",padx=6,pady=3)
-bar2=tk.Frame(root,bg=BG); bar2.pack(fill="x",padx=6,pady=3)
-bar3=tk.Frame(root,bg=BG); bar3.pack(fill="x",padx=6,pady=3)
+status=tk.Label(root,text="Starting SkyCam...",font=("Arial",11,"bold"),bg=BG,fg=WARN,
+                anchor="w",padx=8,pady=4)
+status.grid(row=1,column=0,sticky="ew",padx=6,pady=(2,2))
+
+bar1=tk.Frame(root,bg=BG)
+bar2=tk.Frame(root,bg=BG)
+bar3=tk.Frame(root,bg=BG)
+bar1.grid(row=2,column=0,sticky="ew",padx=6,pady=2)
+bar2.grid(row=3,column=0,sticky="ew",padx=6,pady=2)
+bar3.grid(row=4,column=0,sticky="ew",padx=6,pady=(2,6))
 
 
-def button(parent,text,command,width=None,expand=False):
-    b=tk.Button(parent,text=text,font=("Arial",11,"bold"),command=command,
+def setup_equal_columns(frame,count):
+    for col in range(count):
+        frame.grid_columnconfigure(col,weight=1,uniform=f"{id(frame)}cols")
+
+
+def button(parent,text,command,column):
+    b=tk.Button(parent,text=text,font=("Arial",10,"bold"),command=command,
                 bg=BTN_BG,fg=FG,activebackground=ACTIVE,activeforeground=FG,
-                relief="flat",bd=0,padx=8,pady=8,width=width)
-    b.pack(side="left",fill="x" if expand else None,expand=expand,padx=3)
+                relief="flat",bd=0,padx=5,pady=7)
+    b.grid(row=0,column=column,sticky="ew",padx=2,pady=0)
     return b
 
 
@@ -256,7 +274,6 @@ def sharpness_score(frame):
     if frame is None:
         return -1.0
     h,w=frame.shape[:2]
-    # Score the center 60% so the bench background does not dominate focus.
     x1,x2=int(w*0.20),int(w*0.80)
     y1,y2=int(h*0.20),int(h*0.80)
     roi=frame[y1:y2,x1:x2]
@@ -291,7 +308,6 @@ def pcb_autofocus():
     best_value=None
     best_score=-1.0
 
-    # Coarse sweep across the whole focus range.
     for value in range(FOCUS_MIN,FOCUS_MAX+1,PCB_COARSE_STEP):
         set_ctrl("focus_absolute",value)
         time.sleep(0.04)
@@ -306,7 +322,6 @@ def pcb_autofocus():
         set_status("PCB AUTO could not read a sharp frame",False)
         return
 
-    # Fine sweep around the best coarse result.
     fine_start=max(FOCUS_MIN,best_value-PCB_FINE_RADIUS)
     fine_end=min(FOCUS_MAX,best_value+PCB_FINE_RADIUS)
     for value in range(fine_start,fine_end+1,PCB_FINE_STEP):
@@ -326,23 +341,26 @@ def pcb_autofocus():
     set_status(f"PCB AUTO locked focus: {focus_value} | sharpness {best_score:.0f}",True)
 
 
-button(bar1,"📷 COPY",copy_image,expand=True)
-button(bar1,"💾 SAVE",save_image,expand=True)
-button(bar1,"🔄",refresh_camera,width=4)
-button(bar1,"↻",rotate_image,width=4)
-button(bar1,"D+",zoom_in,width=4)
-button(bar1,"D-",zoom_out,width=4)
-button(bar1,"📌",pin_toggle,width=4)
+setup_equal_columns(bar1,7)
+button(bar1,"📷 COPY",copy_image,0)
+button(bar1,"💾 SAVE",save_image,1)
+button(bar1,"🔄 REFRESH",refresh_camera,2)
+button(bar1,"↻ ROTATE",rotate_image,3)
+button(bar1,"ZOOM +",zoom_in,4)
+button(bar1,"ZOOM -",zoom_out,5)
+button(bar1,"📌 PIN",pin_toggle,6)
 
-button(bar2,"🎯 AUTO FOCUS",focus_auto,expand=True)
-button(bar2,"✨ PCB AUTO",pcb_autofocus,expand=True)
-button(bar2,"🔬 MACRO",focus_macro,expand=True)
-button(bar2,"🔎 NEAR",focus_near,expand=True)
-button(bar2,"🔍 FAR",focus_far,expand=True)
+setup_equal_columns(bar2,5)
+button(bar2,"🎯 AUTO FOCUS",focus_auto,0)
+button(bar2,"✨ PCB AUTO",pcb_autofocus,1)
+button(bar2,"🔬 MACRO",focus_macro,2)
+button(bar2,"🔎 NEAR",focus_near,3)
+button(bar2,"🔍 FAR",focus_far,4)
 
-button(bar3,"◀ FINE",focus_near_fine,expand=True)
-button(bar3,"FOCUS #",focus_read,expand=True)
-button(bar3,"FINE ▶",focus_far_fine,expand=True)
+setup_equal_columns(bar3,3)
+button(bar3,"◀ FINE",focus_near_fine,0)
+button(bar3,"FOCUS #",focus_read,1)
+button(bar3,"FINE ▶",focus_far_fine,2)
 
 
 def update_frame():
@@ -365,7 +383,9 @@ def update_frame():
     frame=process(frame)
     last_frame=frame.copy()
 
-    vw=max(video.winfo_width(),320); vh=max(video.winfo_height(),240)
+    # Only the video region resizes. Control rows remain fixed and visible.
+    vw=max(video.winfo_width()-4,320)
+    vh=max(video.winfo_height()-4,180)
     h,w=frame.shape[:2]
     scale=min(vw/w,vh/h)
     out_w,out_h=max(1,int(w*scale)),max(1,int(h*scale))
