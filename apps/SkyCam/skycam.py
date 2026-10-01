@@ -2,7 +2,7 @@
 # run with: python3 ~/SkyCam/skycam.py
 # path: /home/quarterbitgames/SkyCam/skycam.py
 # description: BloomCore SkyCam. Auto camera reconnect. Clipboard works on X11 or Wayland.
-# version: 1.3
+# version: 1.4
 # format: bloomcore/v1.3
 
 import cv2, subprocess, tempfile, os, time, shutil, tkinter as tk
@@ -22,6 +22,8 @@ cap=None
 last_frame=None
 rotation=0
 digital_zoom=1.0
+video_photo=None
+video_item=None
 
 # Most UVC autofocus webcams expose focus_absolute on a 0..255 scale.
 # Lower values are nearer focus on the camera currently used with SkyCam.
@@ -116,44 +118,46 @@ def connect_camera():
 
 root=tk.Tk()
 root.title("🌸 SkyCam")
-root.geometry("1040x780")
-root.minsize(760,560)
+root.geometry("960x680")
+root.minsize(760,520)
 root.configure(bg=BG)
 
-# Stable responsive layout:
-# - row 0 (video) gets ALL extra width/height
-# - rows 1-4 (status + controls) keep their natural height
-# - controls use fixed grid rows instead of pack reflow
+# The canvas owns all flexible space. A Canvas does not request the size of
+# the displayed camera frame, so the camera image can no longer resize the
+# application window or push the controls off-screen.
 root.grid_rowconfigure(0,weight=1)
 for row in (1,2,3,4):
     root.grid_rowconfigure(row,weight=0)
 root.grid_columnconfigure(0,weight=1)
 
-video=tk.Label(root,bg=BG,anchor="center")
+video=tk.Canvas(root,bg=BG,highlightthickness=0,bd=0)
 video.grid(row=0,column=0,sticky="nsew",padx=6,pady=(6,2))
 
-status=tk.Label(root,text="Starting SkyCam...",font=("Arial",11,"bold"),bg=BG,fg=WARN,
-                anchor="w",padx=8,pady=4)
-status.grid(row=1,column=0,sticky="ew",padx=6,pady=(2,2))
+status=tk.Label(root,text="Starting SkyCam...",font=("Arial",10,"bold"),bg=BG,fg=WARN,
+                anchor="w",padx=8,pady=3)
+status.grid(row=1,column=0,sticky="ew",padx=6,pady=(1,1))
 
-bar1=tk.Frame(root,bg=BG)
-bar2=tk.Frame(root,bg=BG)
-bar3=tk.Frame(root,bg=BG)
-bar1.grid(row=2,column=0,sticky="ew",padx=6,pady=2)
-bar2.grid(row=3,column=0,sticky="ew",padx=6,pady=2)
-bar3.grid(row=4,column=0,sticky="ew",padx=6,pady=(2,6))
+bar1=tk.Frame(root,bg=BG,height=36)
+bar2=tk.Frame(root,bg=BG,height=36)
+bar3=tk.Frame(root,bg=BG,height=36)
+for bar in (bar1,bar2,bar3):
+    bar.grid_propagate(False)
+bar1.grid(row=2,column=0,sticky="ew",padx=6,pady=1)
+bar2.grid(row=3,column=0,sticky="ew",padx=6,pady=1)
+bar3.grid(row=4,column=0,sticky="ew",padx=6,pady=(1,5))
 
 
 def setup_equal_columns(frame,count):
     for col in range(count):
         frame.grid_columnconfigure(col,weight=1,uniform=f"{id(frame)}cols")
+    frame.grid_rowconfigure(0,weight=1)
 
 
 def button(parent,text,command,column):
-    b=tk.Button(parent,text=text,font=("Arial",10,"bold"),command=command,
+    b=tk.Button(parent,text=text,font=("Arial",9,"bold"),command=command,
                 bg=BTN_BG,fg=FG,activebackground=ACTIVE,activeforeground=FG,
-                relief="flat",bd=0,padx=5,pady=7)
-    b.grid(row=0,column=column,sticky="ew",padx=2,pady=0)
+                relief="flat",bd=0,padx=3,pady=3)
+    b.grid(row=0,column=column,sticky="nsew",padx=2,pady=1)
     return b
 
 
@@ -342,25 +346,50 @@ def pcb_autofocus():
 
 
 setup_equal_columns(bar1,7)
-button(bar1,"📷 COPY",copy_image,0)
-button(bar1,"💾 SAVE",save_image,1)
-button(bar1,"🔄 REFRESH",refresh_camera,2)
-button(bar1,"↻ ROTATE",rotate_image,3)
+button(bar1,"COPY",copy_image,0)
+button(bar1,"SAVE",save_image,1)
+button(bar1,"REFRESH",refresh_camera,2)
+button(bar1,"ROTATE",rotate_image,3)
 button(bar1,"ZOOM +",zoom_in,4)
 button(bar1,"ZOOM -",zoom_out,5)
-button(bar1,"📌 PIN",pin_toggle,6)
+button(bar1,"PIN",pin_toggle,6)
 
 setup_equal_columns(bar2,5)
-button(bar2,"🎯 AUTO FOCUS",focus_auto,0)
-button(bar2,"✨ PCB AUTO",pcb_autofocus,1)
-button(bar2,"🔬 MACRO",focus_macro,2)
-button(bar2,"🔎 NEAR",focus_near,3)
-button(bar2,"🔍 FAR",focus_far,4)
+button(bar2,"AUTO FOCUS",focus_auto,0)
+button(bar2,"PCB AUTO",pcb_autofocus,1)
+button(bar2,"MACRO",focus_macro,2)
+button(bar2,"NEAR",focus_near,3)
+button(bar2,"FAR",focus_far,4)
 
 setup_equal_columns(bar3,3)
-button(bar3,"◀ FINE",focus_near_fine,0)
+button(bar3,"FINE <",focus_near_fine,0)
 button(bar3,"FOCUS #",focus_read,1)
-button(bar3,"FINE ▶",focus_far_fine,2)
+button(bar3,"FINE >",focus_far_fine,2)
+
+
+def render_to_canvas(frame):
+    global video_photo,video_item
+    cw=max(video.winfo_width(),1)
+    ch=max(video.winfo_height(),1)
+    if cw<32 or ch<32:
+        return
+
+    h,w=frame.shape[:2]
+    scale=min(cw/w,ch/h)
+    out_w=max(1,int(w*scale))
+    out_h=max(1,int(h*scale))
+    interpolation=cv2.INTER_AREA if scale<1.0 else cv2.INTER_CUBIC
+    display=cv2.resize(frame,(out_w,out_h),interpolation=interpolation)
+    display=cv2.cvtColor(display,cv2.COLOR_BGR2RGB)
+    video_photo=ImageTk.PhotoImage(Image.fromarray(display))
+
+    x=cw//2
+    y=ch//2
+    if video_item is None:
+        video_item=video.create_image(x,y,image=video_photo,anchor="center")
+    else:
+        video.coords(video_item,x,y)
+        video.itemconfigure(video_item,image=video_photo)
 
 
 def update_frame():
@@ -382,21 +411,7 @@ def update_frame():
 
     frame=process(frame)
     last_frame=frame.copy()
-
-    # Only the video region resizes. Control rows remain fixed and visible.
-    vw=max(video.winfo_width()-4,320)
-    vh=max(video.winfo_height()-4,180)
-    h,w=frame.shape[:2]
-    scale=min(vw/w,vh/h)
-    out_w,out_h=max(1,int(w*scale)),max(1,int(h*scale))
-    interpolation=cv2.INTER_AREA if scale<1.0 else cv2.INTER_CUBIC
-    display=cv2.resize(frame,(out_w,out_h),interpolation=interpolation)
-    display=cv2.cvtColor(display,cv2.COLOR_BGR2RGB)
-
-    img=ImageTk.PhotoImage(Image.fromarray(display))
-    video.imgtk=img
-    video.config(image=img)
-
+    render_to_canvas(frame)
     root.after(20,update_frame)
 
 
