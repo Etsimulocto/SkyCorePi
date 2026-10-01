@@ -2,7 +2,7 @@
 # run with: python3 ~/SkyCam/skycam.py
 # path: /home/quarterbitgames/SkyCam/skycam.py
 # description: BloomCore SkyCam. Auto camera reconnect. Clipboard works on X11 or Wayland.
-# version: 1.0
+# version: 1.1
 # format: bloomcore/v1.3
 
 import cv2, subprocess, tempfile, os, time, shutil, tkinter as tk
@@ -22,6 +22,14 @@ cap=None
 last_frame=None
 rotation=0
 digital_zoom=1.0
+
+# Most UVC autofocus webcams expose focus_absolute on a 0..255 scale.
+# Lower values are nearer focus on the camera currently used with SkyCam.
+FOCUS_MIN=0
+FOCUS_MAX=255
+FOCUS_STEP=10
+FOCUS_FINE_STEP=2
+focus_value=None
 
 def set_status(text, good=True):
     status.config(text=text, fg=GOOD if good else WARN)
@@ -45,14 +53,39 @@ def clipboard_copy_png(path):
 
     return False
 
-def run_v4l2(args):
-    subprocess.run(["v4l2-ctl","-d",CAMERA]+args,check=False)
+def run_v4l2(args, capture=False):
+    return subprocess.run(
+        ["v4l2-ctl","-d",CAMERA]+args,
+        check=False,
+        capture_output=capture,
+        text=capture
+    )
 
 def set_ctrl(name,value):
     run_v4l2(["--set-ctrl",f"{name}={value}"])
 
+def get_ctrl(name):
+    result=run_v4l2(["--get-ctrl",name],capture=True)
+    if result.returncode != 0:
+        return None
+    text=(result.stdout or "").strip()
+    # Typical output: "focus_absolute: 123"
+    try:
+        return int(text.rsplit(":",1)[1].strip())
+    except (IndexError,ValueError):
+        return None
+
+def sync_focus():
+    global focus_value
+    current=get_ctrl("focus_absolute")
+    if current is not None:
+        focus_value=max(FOCUS_MIN,min(FOCUS_MAX,current))
+    elif focus_value is None:
+        focus_value=(FOCUS_MIN+FOCUS_MAX)//2
+    return focus_value
+
 def connect_camera():
-    global cap
+    global cap,focus_value
     try:
         if cap is not None:
             cap.release()
@@ -64,7 +97,11 @@ def connect_camera():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,HEIGHT)
     cap.set(cv2.CAP_PROP_FPS,FPS)
-    return cap.isOpened()
+    opened=cap.isOpened()
+    if opened:
+        focus_value=None
+        sync_focus()
+    return opened
 
 root=tk.Tk()
 root.title("🌸 SkyCam")
@@ -80,6 +117,7 @@ status.pack(fill="x",padx=6,pady=4)
 
 bar1=tk.Frame(root,bg=BG); bar1.pack(fill="x",padx=6,pady=3)
 bar2=tk.Frame(root,bg=BG); bar2.pack(fill="x",padx=6,pady=3)
+bar3=tk.Frame(root,bg=BG); bar3.pack(fill="x",padx=6,pady=3)
 
 def button(parent,text,command,width=None,expand=False):
     b=tk.Button(parent,text=text,font=("Arial",11,"bold"),command=command,
@@ -142,24 +180,50 @@ def pin_toggle():
     root.attributes("-topmost",not current)
     set_status("Pinned on top 📌" if not current else "Unpinned",True)
 
-focus_value=0
 def focus_auto():
+    global focus_value
     set_ctrl("focus_automatic_continuous",1)
+    focus_value=None
     set_status("Autofocus ON 🎯",True)
 
-def focus_near():
+def manual_focus_delta(delta,label):
     global focus_value
+    # Read the lens position BEFORE disabling autofocus so manual movement
+    # begins from the camera's real current position instead of a fake zero.
+    sync_focus()
     set_ctrl("focus_automatic_continuous",0)
-    focus_value=max(focus_value-5,0)
+    focus_value=max(FOCUS_MIN,min(FOCUS_MAX,focus_value+delta))
     set_ctrl("focus_absolute",focus_value)
-    set_status(f"Focus near: {focus_value}",True)
+    actual=get_ctrl("focus_absolute")
+    if actual is not None:
+        focus_value=actual
+    set_status(f"{label}: {focus_value}",True)
+
+def focus_near():
+    manual_focus_delta(-FOCUS_STEP,"Focus near")
 
 def focus_far():
+    manual_focus_delta(FOCUS_STEP,"Focus far")
+
+def focus_near_fine():
+    manual_focus_delta(-FOCUS_FINE_STEP,"Fine near")
+
+def focus_far_fine():
+    manual_focus_delta(FOCUS_FINE_STEP,"Fine far")
+
+def focus_macro():
     global focus_value
     set_ctrl("focus_automatic_continuous",0)
-    focus_value=min(focus_value+5,255)
+    focus_value=FOCUS_MIN
     set_ctrl("focus_absolute",focus_value)
-    set_status(f"Focus far: {focus_value}",True)
+    actual=get_ctrl("focus_absolute")
+    if actual is not None:
+        focus_value=actual
+    set_status(f"PCB / MACRO focus: {focus_value} — move camera slightly if needed",True)
+
+def focus_read():
+    value=sync_focus()
+    set_status(f"Current focus: {value}",True)
 
 button(bar1,"📷 COPY",copy_image,expand=True)
 button(bar1,"💾 SAVE",save_image,expand=True)
@@ -170,8 +234,13 @@ button(bar1,"D-",zoom_out,width=4)
 button(bar1,"📌",pin_toggle,width=4)
 
 button(bar2,"🎯 AUTO FOCUS",focus_auto,expand=True)
+button(bar2,"🔬 PCB / MACRO",focus_macro,expand=True)
 button(bar2,"🔎 NEAR",focus_near,expand=True)
 button(bar2,"🔍 FAR",focus_far,expand=True)
+
+button(bar3,"NEAR +",focus_near_fine,expand=True)
+button(bar3,"FOCUS #",focus_read,expand=True)
+button(bar3,"FAR +",focus_far_fine,expand=True)
 
 def update_frame():
     global cap,last_frame
