@@ -9,7 +9,7 @@ class Dashboard:
         frame.pack(fill='x',before=console.draft)
         self.status=tk.StringVar()
         ttk.Label(frame,textvariable=self.status,wraplength=290,justify='left').pack(fill='x')
-        for name,command in [('Reconnect USB',self.app.connect),('Reconnect gamepad',self.gamepad),('Detect / preview camera',self.camera),('Check Ollama',console.chat.detect),('Copy device diagnostics',self.copy),('Save settings',self.app.save_preferences)]:
+        for name,command in [('Reconnect USB',self.app.connect),('Reconnect gamepad',self.gamepad),('Detect / preview camera',self.camera),('Check Ollama',console.chat.detect),('Stop local AI',lambda:console.chat.power('stop')),('Start local AI',lambda:console.chat.power('start')),('Copy device diagnostics',self.copy),('Save settings',self.app.save_preferences)]:
             ttk.Button(frame,text=name,command=command).pack(fill='x')
     def gamepad(self):
         self.console.gamepad.close();self.console.gamepad.next_scan=0

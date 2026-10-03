@@ -8,7 +8,7 @@ from backend import Backend
 
 class ChatPanel:
     def __init__(self,console):
-        self.console=console;self.app=console.app;self.backend=Backend();self.events=queue.Queue();self.epoch=0;self.busy=False;self.pending=None;self.phase="IDLE";self.phase_until=0;self.last_request=None;self.connection_status="checking"
+        self.console=console;self.app=console.app;self.backend=Backend();self.events=queue.Queue();self.epoch=0;self.busy=False;self.pending=None;self.phase="IDLE";self.phase_until=0;self.last_request=None;self.connection_status="checking";self.power_off=False;self.power_busy=False
         frame=ttk.LabelFrame(console.dev,text='Local conversation',padding=6)
         frame.pack(fill='x',before=console.draft)
         self.model=tk.StringVar(value='qwen2.5:0.5b')
@@ -28,6 +28,13 @@ class ChatPanel:
             except Exception as exc:self.events.put((epoch,kind,None,str(exc)))
         threading.Thread(target=run,daemon=True).start()
 
+    def power(self,action):
+        if self.power_busy:return
+        from ai_power import stop,start
+        self.invalidate();self.power_busy=True;self.power_off=True
+        self.connection_status='Stopping Ollama…' if action=='stop' else 'Starting Ollama…'
+        self.worker('power_'+action,stop if action=='stop' else start,self.epoch)
+
     def detect(self):
         if not self.console.active:return
         self.connection_status='checking'
@@ -37,7 +44,7 @@ class ChatPanel:
         self.worker('diagnostics',report,self.epoch)
 
     def send(self):
-        if self.busy or not self.console.active:return
+        if self.busy or self.power_off or self.power_busy or not self.console.active:return
         text=self.entry.get('1.0','end').strip()[:4000]
         if not text:return
         speaker=self.console.speaker.get();model=self.model.get()
@@ -81,6 +88,9 @@ class ChatPanel:
                 if kind=='reply':
                     self.phase='ERROR';self.last_request['elapsed_s']=round(time.monotonic()-self.last_request['started'],2);self.last_request['error']=error
                     self.app.log(self.diagnostic_summary())
+            elif kind.startswith('power_'):
+                self.power_busy=False;self.connection_status=result;self.status.set(result);self.app.log(result)
+                if kind=='power_start':self.power_off=False;self.detect()
             elif kind=='models':
                 self.connection_status='ready' if result else 'reachable · no models'
                 self.models['values']=result

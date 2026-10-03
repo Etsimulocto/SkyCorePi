@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.5.1
+# SkyCorePi / BRO 0.5.2
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,7 +27,7 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.5.1, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.5.2, board firmware 0.1.0, USB protocol 1.
 
 ## Conversation feedback (0.4.1)
 
@@ -48,3 +48,7 @@ If USB appears in lsusb but no joystick node appears, run `ls /dev/input/js*` an
 ## Saved settings and device dashboard (0.5.1)
 
 The Devices / settings panel reports session, USB, gamepad, camera and Ollama status, with reconnect/detect buttons and Copy device diagnostics. Ollama status reflects the latest model check or chat result; Check Ollama refreshes it. Saved preferences include model, speaker, per-speaker hues, camera/gamepad selections, serial port, knob direction/edges and window geometry. Save settings explicitly or close normally to save to `~/.config/skycorepi/settings.json`. Demo mode does not read or write preferences. Camera capture is started through the preview controls, not automatically by restoring its selection. Gamepad bindings remain in their separate settings file. CLI --port overrides the saved port. Conversation text is not stored by this feature.
+
+## Local AI power (0.5.2)
+
+Run `bash install_pi.sh` once for this update. It installs a sudoers rule limited to starting/stopping `ollama.service` for your user; it validates the rule before installation. **Stop local AI** discards pending chat replies and stops Ollama. **Start local AI** restarts it for conversation. Closing BRO also attempts verified Ollama shutdown, printing the result in the terminal and saving `~/.cache/skycorepi/ai-shutdown.txt`. If service control is unavailable, loaded models are unloaded and the report explicitly says the service remains running. Shared Ollama clients are also interrupted when the service stops. Demo mode never stops Ollama. This feature does not disable Ollama's boot-time service enablement.

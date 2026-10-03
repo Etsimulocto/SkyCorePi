@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.5.1"
+VERSION="0.5.2"
 from console import Console
 from preferences import Preferences
 
@@ -347,7 +347,13 @@ class App:
         self.control.set("KNOB → "+CONTROLS[self.face.control])
         self.draw(t);self.root.after(33,self.frame)
 
-    def close(self):self.save_preferences();self.console.gamepad.close();self.console.camera_feed.stop();self.usb.close();self.root.destroy()
+    def close(self):
+        self.save_preferences();self.console.chat.invalidate()
+        self.console.gamepad.close();self.console.camera_feed.stop();self.usb.close()
+        if not self.demo:
+            from ai_power import shutdown_report
+            threading.Thread(target=shutdown_report,daemon=False).start()
+        self.root.destroy()
 
 
 if __name__=="__main__":
