@@ -72,6 +72,7 @@ class CameraPanel:
         self.status=tk.StringVar(value='Preview stopped')
         ttk.Label(self.frame,textvariable=self.status,wraplength=290).pack(fill='x')
         self.mode=tk.StringVar(value='Off');self.overlay=tk.BooleanVar(value=True)
+        self.invert_x=tk.BooleanVar(value=True)
         self.follow=tk.BooleanVar(value=True);self.target=None;self.target_at=0;self.gaze_y=0;self.last_tracking=None
         self.vision_mode=None;self.vision_overlay=None
         self.vision_status=tk.StringVar(value='Vision off')
@@ -79,6 +80,7 @@ class CameraPanel:
         mode.bind('<<ComboboxSelected>>',lambda _:self.configure_vision())
         ttk.Checkbutton(self.frame,text='Tracking overlay',variable=self.overlay,command=self.configure_vision).pack(anchor='w')
         ttk.Checkbutton(self.frame,text='Eyes follow target',variable=self.follow).pack(anchor='w')
+        ttk.Checkbutton(self.frame,text='Invert gaze X (left / right)',variable=self.invert_x,command=self.direction_changed).pack(anchor='w')
         ttk.Label(self.frame,textvariable=self.vision_status,wraplength=290).pack(fill='x')
         self.image=ttk.Label(self.frame,anchor='center');self.image.pack(fill='x')
 
@@ -101,6 +103,10 @@ class CameraPanel:
         self.vision_status.set('Vision '+self.mode.get())
         self.app.log('Vision mode: '+self.mode.get())
 
+    def direction_changed(self):
+        self.app.log('Camera gaze X inverted: '+str(self.invert_x.get()))
+        self.app.save_preferences()
+
     def observation(self,value):
         self.target=value['target'];self.target_at=time.monotonic() if self.target is not None else self.target_at
         state='tracking' if self.target is not None else 'searching'
@@ -113,6 +119,7 @@ class CameraPanel:
             x,y=self.target if self.target is not None and time.monotonic()-self.target_at<1 else (None,None)
             if x is None and time.monotonic()-self.target_at>1:x,y=0,0
             if x is not None:
+                x=-x if self.invert_x.get() else x
                 self.app.face.gaze+=(x-self.app.face.gaze)*0.12
                 self.gaze_y+=(y-self.gaze_y)*0.12
         else:self.gaze_y=0

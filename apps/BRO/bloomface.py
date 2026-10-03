@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.7.0"
+VERSION="0.7.1"
 from console import Console
 from preferences import Preferences
 from appearance import Appearance
@@ -142,7 +142,7 @@ class App:
         if speaker in c.speaker_hues:
             self.face.hue=c.speaker_hues['BRO']
             c.speaker.set(speaker)
-        for key,var in [('model',c.chat.model),('camera',c.camera_feed.source),('gamepad',c.gamepad.device),('port',self.port),('detent',self.detent),('reverse',self.reverse)]:
+        for key,var in [('model',c.chat.model),('camera',c.camera_feed.source),('camera_invert_x',c.camera_feed.invert_x),('gamepad',c.gamepad.device),('port',self.port),('detent',self.detent),('reverse',self.reverse)]:
             if key in data:var.set(data[key])
         self.settings()
         if 'geometry' in data:self.root.geometry(data['geometry'])
@@ -151,7 +151,7 @@ class App:
     def save_preferences(self):
         if self.demo:return
         c=self.console;c.speaker_hues[c.speaker.get()]=self.face.hue
-        data=dict(appearance=self.appearance.values,model=c.chat.model.get(),camera=c.camera_feed.source.get(),gamepad=c.gamepad.device.get(),port=self.port.get(),speaker=c.speaker.get(),hues=c.speaker_hues,detent=self.detent.get(),reverse=self.reverse.get(),geometry=self.root.geometry())
+        data=dict(appearance=self.appearance.values,model=c.chat.model.get(),camera=c.camera_feed.source.get(),camera_invert_x=c.camera_feed.invert_x.get(),gamepad=c.gamepad.device.get(),port=self.port.get(),speaker=c.speaker.get(),hues=c.speaker_hues,detent=self.detent.get(),reverse=self.reverse.get(),geometry=self.root.geometry())
         try:self.preferences.save(data);self.log('Settings saved')
         except OSError as exc:self.log('Settings save error: '+str(exc))
 

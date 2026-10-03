@@ -14,7 +14,8 @@ class Preferences:
         for key in ('model','camera','gamepad','port','speaker'):
             if isinstance(data.get(key),str) and len(data[key])<256:clean[key]=data[key]
         if data.get('detent') in ('2','4'):clean['detent']=data['detent']
-        if type(data.get('reverse')) is bool:clean['reverse']=data['reverse']
+        for key in ('reverse','camera_invert_x'):
+            if type(data.get(key)) is bool:clean[key]=data[key]
         if isinstance(data.get('geometry'),str) and re.fullmatch(r'\d{3,4}x\d{3,4}(?:[+-]\d+[+-]\d+)?',data['geometry']):clean['geometry']=data['geometry']
         from appearance import validate
         clean["appearance"]=validate(data.get("appearance",{}))

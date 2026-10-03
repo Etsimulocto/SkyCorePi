@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.7.0
+# SkyCorePi / BRO 0.7.1
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,7 +27,7 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.7.0, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.7.1, board firmware 0.1.0, USB protocol 1.
 
 ## Conversation feedback (0.4.1)
 
@@ -64,3 +64,5 @@ Look Editor 0.6.1 replaces the obscured root Background control with **Panel Bor
 Install this update with `bash install_pi.sh` to include OpenCV face cascade data. Enable Camera preview, then choose **Face** or **Motion** below its controls. Face uses a frontal-face Haar detector; Motion uses background differences for a stationary camera. A box and target crosshair show observations; the largest initial target is selected, then the closest target center. This is basic target continuity, not identity recognition. Face detection may miss profiles, small faces or poor lighting.
 
 **Eyes follow target** smoothly controls pupils in both axes. On losing a target, gaze holds briefly then centers. Manual gaze inputs can compete with tracking; disable Eyes follow target to use manual gaze. Some stylized expressions override horizontal pupil position. **Tracking overlay** hides/shows marks. Vision off keeps plain preview. Frame capture remains shared with preview in its existing child process; detection runs about five times a second on reduced frames. Diagnostics show searching/tracking, target count and detection time; only state transitions are logged. Camera stops on hide/session end/app close. No recording, identification, cloud inference, chat image input or motor commands are added. Object/hand/marker modes remain later additions. Real Pi camera tracking needs testing.
+
+Camera direction (0.7.1): **Invert gaze X (left / right)** reverses only camera-driven horizontal eye movement. It starts enabled for a camera facing you. Toggle it while moving left/right to match your setup; the choice saves immediately and loads next launch. The preview and tracking overlay retain the original camera orientation.
