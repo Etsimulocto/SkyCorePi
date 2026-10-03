@@ -16,6 +16,15 @@ if __name__=="__main__":
     # Verify speaker labels, text editing, panel toggles and session boundaries.
     from console import SPEAKERS
     from types import SimpleNamespace
+    from console import SPEAKER_HUES
+    for speaker in SPEAKERS:
+        app.console.speaker.set(speaker)
+        assert app.face.hue==SPEAKER_HUES[speaker]
+    app.face.hue=0.23
+    app.console.speaker.set("Sky");app.console.speaker.set("GRIT")
+    assert app.face.hue==0.23,"Color knob changes stay with their speaker"
+    app.console.speaker_hues=dict(SPEAKER_HUES)
+    app.console.speaker.set("BRO")
     for speaker in SPEAKERS:
         app.console.speaker.set(speaker)
         assert app.console.show_output(speaker,"Hello "+speaker,source="manual test")

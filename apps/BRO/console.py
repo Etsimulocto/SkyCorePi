@@ -5,6 +5,7 @@ from camera import CameraPanel
 from chat import ChatPanel
 
 SPEAKERS=("BRO","Sky","Cold","Monday","GRIT")
+SPEAKER_HUES={"BRO":0.46,"Sky":0.60,"Cold":0.51,"Monday":0.90,"GRIT":0.08}
 
 class Console:
     def __init__(self, app):
@@ -12,13 +13,16 @@ class Console:
         self.active=True
         self.messages=[]
         self.speaker=tk.StringVar(value="BRO")
+        self.speaker_hues=dict(SPEAKER_HUES);self.last_speaker="BRO"
+        app.face.hue=self.speaker_hues["BRO"]
+        self.speaker.trace_add("write",self.change_speaker_color)
         self.developer=tk.BooleanVar(value=True)
         self.camera_visible=tk.BooleanVar(value=False)
         bar=ttk.Frame(app.root,padding=(12,4));bar.pack(fill="x")
         ttk.Label(bar,text="Speaker:").pack(side="left")
         selector=ttk.Combobox(bar,textvariable=self.speaker,values=SPEAKERS,state="readonly",width=10)
         selector.pack(side="left",padx=6)
-        selector.bind("<<ComboboxSelected>>",lambda _:app.log("Speaker selected: "+self.speaker.get()))
+        
         ttk.Checkbutton(bar,text="Dev panels",variable=self.developer,command=self.toggle_dev).pack(side="left",padx=8)
         ttk.Checkbutton(bar,text="Camera preview",variable=self.camera_visible,command=self.toggle_camera).pack(side="left")
         self.session_button=ttk.Button(bar,text="End session",command=self.toggle_session)
@@ -59,6 +63,14 @@ class Console:
         self.camera=self.camera_feed.frame
         self.show_output("BRO","Face online. Ready to build.",source="sample")
         self.chat=ChatPanel(self)
+
+    def change_speaker_color(self,*_):
+        speaker=self.speaker.get()
+        if speaker not in SPEAKER_HUES or speaker==self.last_speaker:return
+        self.speaker_hues[self.last_speaker]=self.app.face.hue
+        self.app.face.hue=self.speaker_hues[speaker]
+        self.last_speaker=speaker
+        self.app.log("Speaker selected: "+speaker+" · face color updated")
 
     def text_box(self,parent,height,expand=False):
         frame=ttk.Frame(parent);frame.pack(fill="both" if expand else "x",expand=expand)
