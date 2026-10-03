@@ -90,6 +90,11 @@ if __name__=="__main__":
     pad.dispatch("Center gaze");assert app.face.gaze==0
     app.console.camera_visible.set(False);app.console.toggle_camera()
     app.console.speaker.set("BRO")
+    dashboard=app.console.dashboard
+    dashboard.poll()
+    assert "USB: disconnected" in dashboard.summary()
+    assert "Speaker:" in dashboard.summary()
+    dashboard.copy();assert "Chat diagnostics:" in root.clipboard_get()
     app.face.mood=0;app.draw(3.0);root.update()
     try:
         from PIL import ImageGrab

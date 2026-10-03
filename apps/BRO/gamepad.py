@@ -27,7 +27,7 @@ class Decoder:
 
 class Gamepad:
     def __init__(self,console):
-        self.console=console;self.app=console.app;self.fd=None;self.decoder=Decoder();self.next_scan=0;self.learning=False;self.learn_until=0
+        self.console=console;self.app=console.app;self.fd=None;self.device_path="";self.decoder=Decoder();self.next_scan=0;self.learning=False;self.learn_until=0
         self.path=Path.home()/'.config'/'skycorepi'/'gamepad.json'
         self.bindings=dict(DEFAULTS)
         try:
@@ -94,7 +94,7 @@ class Gamepad:
             target=paths[0] if paths and self.device.get()=='Auto' else self.device.get()
             if target=='Auto':self.status.set('No gamepad · connect USB controller');return
             try:
-                self.fd=os.open(target,os.O_RDONLY|os.O_NONBLOCK);self.decoder=Decoder()
+                self.fd=os.open(target,os.O_RDONLY|os.O_NONBLOCK);self.device_path=target;self.decoder=Decoder()
                 self.status.set('Connected '+target);self.app.log('Gamepad connected: '+target)
             except OSError as exc:self.status.set('Gamepad: '+str(exc));return
         if self.fd is not None:

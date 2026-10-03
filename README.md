@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.5.0
+# SkyCorePi / BRO 0.5.1
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,7 +27,7 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.5.0, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.5.1, board firmware 0.1.0, USB protocol 1.
 
 ## Conversation feedback (0.4.1)
 
@@ -44,3 +44,7 @@ Pi/Linux controllers exposed as `/dev/input/js*` autodetect and reconnect. Defau
 Bindings save locally to `~/.config/skycorepi/gamepad.json` across restarts. A single mapping is used for the selected controller; select a device when several are attached. Dead zone and direction latching avoid repeated actions while held. Return a stick to center before another step. Gaze stays where assigned; map Center gaze to a button if desired. Session end closes gamepad input. No rumble or motors are driven. Windows gamepad support remains future work.
 
 If USB appears in lsusb but no joystick node appears, run `ls /dev/input/js*` and check the joydev driver/desktop input permissions; do not run BRO as root. Real Xbox button numbering still needs bench validation.
+
+## Saved settings and device dashboard (0.5.1)
+
+The Devices / settings panel reports session, USB, gamepad, camera and Ollama status, with reconnect/detect buttons and Copy device diagnostics. Ollama status reflects the latest model check or chat result; Check Ollama refreshes it. Saved preferences include model, speaker, per-speaker hues, camera/gamepad selections, serial port, knob direction/edges and window geometry. Save settings explicitly or close normally to save to `~/.config/skycorepi/settings.json`. Demo mode does not read or write preferences. Camera capture is started through the preview controls, not automatically by restoring its selection. Gamepad bindings remain in their separate settings file. CLI --port overrides the saved port. Conversation text is not stored by this feature.

@@ -8,7 +8,7 @@ from backend import Backend
 
 class ChatPanel:
     def __init__(self,console):
-        self.console=console;self.app=console.app;self.backend=Backend();self.events=queue.Queue();self.epoch=0;self.busy=False;self.pending=None;self.phase="IDLE";self.phase_until=0;self.last_request=None
+        self.console=console;self.app=console.app;self.backend=Backend();self.events=queue.Queue();self.epoch=0;self.busy=False;self.pending=None;self.phase="IDLE";self.phase_until=0;self.last_request=None;self.connection_status="checking"
         frame=ttk.LabelFrame(console.dev,text='Local conversation',padding=6)
         frame.pack(fill='x',before=console.draft)
         self.model=tk.StringVar(value='qwen2.5:0.5b')
@@ -30,6 +30,7 @@ class ChatPanel:
 
     def detect(self):
         if not self.console.active:return
+        self.connection_status='checking'
         self.status.set('Checking local Ollama…')
         self.worker('models',self.backend.models,self.epoch)
         from diagnostics import report
@@ -75,11 +76,13 @@ class ChatPanel:
             except queue.Empty:break
             if epoch!=self.epoch or not self.console.active:continue
             if error:
+                if kind in ('models','reply'):self.connection_status='error: '+error
                 self.status.set('Local AI error: '+error);self.app.log(self.status.get())
                 if kind=='reply':
                     self.phase='ERROR';self.last_request['elapsed_s']=round(time.monotonic()-self.last_request['started'],2);self.last_request['error']=error
                     self.app.log(self.diagnostic_summary())
             elif kind=='models':
+                self.connection_status='ready' if result else 'reachable · no models'
                 self.models['values']=result
                 if result and self.model.get() not in result:self.model.set(result[0])
                 self.status.set('Ollama ready · '+str(len(result))+' models' if result else 'No models installed')
@@ -87,6 +90,7 @@ class ChatPanel:
             elif kind=='diagnostics':
                 self.app.log(result);self.app.log(self.diagnostic_summary())
             elif kind=='reply':
+                self.connection_status="ready"
                 speaker,text,reply,sources=result
                 self.backend.commit(speaker,text,reply)
                 self.console.show_output(speaker,reply,source='local AI')

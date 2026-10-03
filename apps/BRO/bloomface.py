@@ -16,8 +16,9 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.5.0"
+VERSION="0.5.1"
 from console import Console
+from preferences import Preferences
 
 
 def instance_lock():
@@ -124,7 +125,30 @@ class App:
         root.bind("f",lambda e:self.keyboard(e,self.toggle_fullscreen))
         root.bind("<Escape>",lambda _:self.leave_fullscreen())
         root.protocol("WM_DELETE_WINDOW",self.close)
-        self.refresh();self.log("Session started"+(" DEMO" if demo else ""));self.frame()
+        self.refresh();self.load_preferences();self.log("Session started"+(" DEMO" if demo else ""));self.frame()
+
+    def load_preferences(self):
+        self.preferences=Preferences()
+        if self.demo:return
+        data=self.preferences.load()
+        c=self.console
+        c.speaker_hues.update(data.get('hues',{}))
+        speaker=data.get('speaker','BRO')
+        if speaker in c.speaker_hues:
+            self.face.hue=c.speaker_hues['BRO']
+            c.speaker.set(speaker)
+        for key,var in [('model',c.chat.model),('camera',c.camera_feed.source),('gamepad',c.gamepad.device),('port',self.port),('detent',self.detent),('reverse',self.reverse)]:
+            if key in data:var.set(data[key])
+        self.settings()
+        if 'geometry' in data:self.root.geometry(data['geometry'])
+        self.log('Saved settings loaded' if data else 'Default settings')
+
+    def save_preferences(self):
+        if self.demo:return
+        c=self.console;c.speaker_hues[c.speaker.get()]=self.face.hue
+        data=dict(model=c.chat.model.get(),camera=c.camera_feed.source.get(),gamepad=c.gamepad.device.get(),port=self.port.get(),speaker=c.speaker.get(),hues=c.speaker_hues,detent=self.detent.get(),reverse=self.reverse.get(),geometry=self.root.geometry())
+        try:self.preferences.save(data);self.log('Settings saved')
+        except OSError as exc:self.log('Settings save error: '+str(exc))
 
     def keyboard(self,event,action):
         if isinstance(event.widget,(tk.Text,tk.Entry,ttk.Entry,ttk.Combobox)):return
@@ -315,6 +339,7 @@ class App:
         self.console.camera_feed.poll()
         self.console.chat.poll()
         self.console.gamepad.poll()
+        self.console.dashboard.poll()
         if t>self.next_blink:
             self.blink_at=t;self.next_blink=t+random.uniform(2,5)
         if self.face.surprise!=self.last_surprise:
@@ -322,7 +347,7 @@ class App:
         self.control.set("KNOB → "+CONTROLS[self.face.control])
         self.draw(t);self.root.after(33,self.frame)
 
-    def close(self):self.console.gamepad.close();self.console.camera_feed.stop();self.usb.close();self.root.destroy()
+    def close(self):self.save_preferences();self.console.gamepad.close();self.console.camera_feed.stop();self.usb.close();self.root.destroy()
 
 
 if __name__=="__main__":

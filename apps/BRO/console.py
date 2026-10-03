@@ -4,6 +4,7 @@ from tkinter import ttk
 from camera import CameraPanel
 from chat import ChatPanel
 from gamepad import Gamepad
+from dashboard import Dashboard
 
 SPEAKERS=("BRO","Sky","Cold","Monday","GRIT")
 SPEAKER_HUES={"BRO":0.46,"Sky":0.60,"Cold":0.51,"Monday":0.90,"GRIT":0.08}
@@ -65,6 +66,7 @@ class Console:
         self.show_output("BRO","Face online. Ready to build.",source="sample")
         self.chat=ChatPanel(self)
         self.gamepad=Gamepad(self)
+        self.dashboard=Dashboard(self)
 
     def change_speaker_color(self,*_):
         speaker=self.speaker.get()
