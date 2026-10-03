@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.8.0
+# SkyCorePi / BRO 0.8.1
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,7 +27,7 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.8.0, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.8.1, board firmware 0.1.0, USB protocol 1.
 
 ## Conversation feedback (0.4.1)
 
@@ -83,3 +83,5 @@ The optional installer creates a separate MediaPipe 1.0.1 runtime and downloads 
 Supported static signals: Open_Palm, Closed_Fist, Thumb_Up, Thumb_Down, Victory (peace), Pointing_Up and ILoveYou. A signal must exceed confidence and remain stable for the hold duration. After firing, lower the hand for at least 0.4 seconds before another action; changing signals alone does not re-arm. Stalled frames do not count as a hold/release. No wave or left/right pointing classifier is claimed. Eye following competes with manual gaze actions; disable it when assigning Look left/right.
 
 Source: [Google MediaPipe Gesture Recognizer Python guide](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer/python). Camera remains stoppable and local. This release does not add voice synthesis, Architect enrollment, recording, chat vision or motor control.
+
+0.8.1 fixes multiprocessing overwriting the vision venv package path when BRO starts from system Python. Existing vision installations need only git pull and an app restart. Camera now has a direct Copy camera / vision status button.

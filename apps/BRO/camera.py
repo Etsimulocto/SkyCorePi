@@ -22,6 +22,8 @@ def capture_worker(messages,stop,source,vision_mode=None,vision_overlay=None):
         try:messages.put_nowait((kind,value))
         except queue.Full:pass
     try:
+        from vision_runtime import restore_packages
+        restore_packages()
         import cv2
         sources=candidates() if source=='Auto' else [int(source) if source.isdigit() else source]
         for device in sources:
@@ -76,6 +78,7 @@ class CameraPanel:
         ttk.Button(buttons,text='Stop',command=self.stop).pack(side='right')
         self.status=tk.StringVar(value='Preview stopped')
         ttk.Label(self.frame,textvariable=self.status,wraplength=290).pack(fill='x')
+        ttk.Button(self.frame,text='Copy camera / vision status',command=self.copy_status).pack(fill='x')
         self.mode=tk.StringVar(value='Off');self.overlay=tk.BooleanVar(value=True)
         self.invert_x=tk.BooleanVar(value=True)
         self.follow=tk.BooleanVar(value=True);self.target=None;self.target_at=0;self.gaze_y=0;self.last_tracking=None
@@ -96,6 +99,11 @@ class CameraPanel:
         self.update_values()
         self.gestures=GesturePanel(self)
         self.image=ttk.Label(self.frame,anchor='center');self.image.pack(fill='x')
+
+    def copy_status(self):
+        text=self.status.get()+'\n'+self.vision_status.get()+'\n'+self.gestures.status.get()
+        self.app.root.clipboard_clear();self.app.root.clipboard_append(text)
+        self.app.log('Camera / vision status copied')
 
     def start(self):
         if not self.app.console.active:return

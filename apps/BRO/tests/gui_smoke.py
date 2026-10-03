@@ -116,6 +116,7 @@ if __name__=="__main__":
     app.draw(3);feed.mode.set("Off");feed.configure_vision()
     assert feed.target is None
     feed.poll()
+    feed.copy_status();assert feed.vision_status.get() in root.clipboard_get()
     gestures=feed.gestures
     with patch.object(app,'save_preferences'),patch.object(app.console.gamepad,'dispatch') as dispatch:
         gestures.signal.set('Victory');gestures.action.set('Next speaker');gestures.assign()
