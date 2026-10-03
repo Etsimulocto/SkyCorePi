@@ -28,8 +28,16 @@ class Console:
         self.panes=ttk.Panedwindow(app.root,orient="horizontal")
         self.panes.pack(fill="both",expand=True)
         self.face=ttk.Frame(self.panes)
-        self.dev=ttk.Frame(self.panes,padding=8,width=310)
-        self.panes.add(self.face,weight=4);self.panes.add(self.dev,weight=1)
+        self.dev_shell=ttk.Frame(self.panes,width=330)
+        dev_canvas=tk.Canvas(self.dev_shell,bg="#0d1727",highlightthickness=0,width=330)
+        dev_scroll=ttk.Scrollbar(self.dev_shell,orient="vertical",command=dev_canvas.yview)
+        dev_canvas.configure(yscrollcommand=dev_scroll.set)
+        dev_scroll.pack(side="right",fill="y");dev_canvas.pack(side="left",fill="both",expand=True)
+        self.dev=ttk.Frame(dev_canvas,padding=8)
+        dev_window=dev_canvas.create_window(0,0,window=self.dev,anchor="nw")
+        self.dev.bind("<Configure>",lambda _:dev_canvas.configure(scrollregion=dev_canvas.bbox("all")))
+        dev_canvas.bind("<Configure>",lambda e:dev_canvas.itemconfigure(dev_window,width=e.width))
+        self.panes.add(self.face,weight=4);self.panes.add(self.dev_shell,weight=1)
         self.speech_frame=ttk.Frame(self.face,padding=8)
         self.speech_frame.pack(side="bottom",fill="x")
         heading=ttk.Frame(self.speech_frame);heading.pack(fill="x")
@@ -93,11 +101,11 @@ class Console:
 
     def toggle_dev(self):
         if self.developer.get():
-            self.panes.add(self.dev,weight=1)
+            self.panes.add(self.dev_shell,weight=1)
         else:
             self.camera_feed.stop()
             self.camera_visible.set(False);self.camera.pack_forget()
-            self.panes.forget(self.dev)
+            self.panes.forget(self.dev_shell)
 
     def toggle_camera(self):
         if self.camera_visible.get():
