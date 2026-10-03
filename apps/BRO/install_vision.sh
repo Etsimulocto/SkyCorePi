@@ -17,7 +17,8 @@ with urllib.request.urlopen(url,timeout=60) as response:
 if hashlib.sha256(data).hexdigest()!='97952348cf6a6a4915c2ea1496b4b37ebabc50cbbf80571435643c455f2b0482':raise RuntimeError('Gesture model checksum mismatch')
 temp=p.with_suffix('.tmp');temp.write_bytes(data);temp.replace(p)
 print('Gesture model installed. SHA256:',hashlib.sha256(data).hexdigest())
-from mediapipe.tasks import python, vision
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 options=vision.GestureRecognizerOptions(base_options=python.BaseOptions(model_asset_path=str(p)))
 with vision.GestureRecognizer.create_from_options(options):pass
 print('MediaPipe ready. Restart BRO, select Hands mode.')

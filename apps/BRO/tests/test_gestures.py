@@ -40,3 +40,23 @@ class RecognizerTests(unittest.TestCase):
             self.assertIsNone(name)
             self.assertEqual(points,[])
         finally:r.close()
+
+    def test_real_model_thumb_up(self):
+        import os
+        if os.environ.get('BRO_VISION_TEST')!='1':self.skipTest('Optional vision runtime integration runs in CI')
+        import hashlib
+        import urllib.request
+        import cv2
+        import numpy as np
+        from gestures import HandRecognizer
+        # Google's published MediaPipe test image; no user photos.
+        data=urllib.request.urlopen('https://storage.googleapis.com/mediapipe-assets/thumb_up.jpg',timeout=30).read()
+        self.assertEqual(hashlib.sha256(data).hexdigest(),'5d673c081ab13b8a1812269ff57047066f9c33c07db5f4178089e8cb3fdc0291')
+        frame=cv2.imdecode(np.frombuffer(data,dtype=np.uint8),cv2.IMREAD_COLOR)
+        r=HandRecognizer()
+        try:
+            name,score,points=r.detect(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
+            self.assertEqual(name,'Thumb_Up')
+            self.assertGreater(score,.7)
+            self.assertEqual(len(points),21)
+        finally:r.close()

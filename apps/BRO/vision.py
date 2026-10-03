@@ -25,7 +25,7 @@ class Tracker:
             try:
                 from gestures import HandRecognizer
                 self.hands=HandRecognizer()
-            except Exception as exc:self.error='Hands unavailable: '+str(exc)
+            except Exception as exc:self.error='Hands unavailable: '+str(exc)+'. Run bash apps/BRO/install_vision.sh'
         if mode==1 and self.detector is None:
             paths=[]
             if hasattr(self.cv,'data'):paths.append(str(Path(self.cv.data.haarcascades)/'haarcascade_frontalface_default.xml'))

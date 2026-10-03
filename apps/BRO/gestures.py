@@ -85,3 +85,4 @@ class GesturePanel:
             action=self.bindings.get(fired,'None')
             self.app.log('Gesture '+fired+' → '+action)
             self.app.console.gamepad.dispatch(action)
+        if self.gate.latched:self.status.set((name or 'No signal')+' · lower hand to re-arm')
