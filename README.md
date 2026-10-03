@@ -1,10 +1,12 @@
 # SkyCorePi / BRO 0.8.1
 
-BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
+BRO is our robot interface development console on Raspberry Pi: an animated face, physical controls, local AI conversation, live camera preview, tracking, hand signals, and copyable diagnostics. We are working out the interface before building the robot body.
 
-## Raspberry Pi
+Sky, Cold, Monday, and GRIT load their original identity cards from `characters/`. Names, card IDs, soulprint markers, and source metadata remain intact. Each speaker has a separate in-memory conversation history; BRO has his own robot identity.
 
-Close BloomFace and SkyCam before starting. Existing BloomFace firmware 0.1.0 and GPIO7/8/9 encoder wiring remain compatible; no reflash required.
+## Start on Raspberry Pi
+
+Close BRO/BloomFace before updating. Close SkyCam before opening BRO's camera preview; both apps currently need exclusive camera access.
 
 ```bash
 cd ~/SkyCorePi
@@ -13,75 +15,91 @@ bash install_pi.sh
 python3 app.py --port /dev/ttyACM0
 ```
 
-The installer pauses the old BloomFace plug watcher and starts BRO's watcher, which identifies the firmware before launching. App singleton lock is shared with BloomFace to prevent duplicate windows. `bash launch_skycore.sh` also launches BRO. The former home/chat UI in `app.py` is replaced; `app_test.py` remains a legacy reference, not the launcher.
+Run the base installer for first setup or dependency/service-permission changes. Normal updates need only `git pull` and an app restart. `bash launch_skycore.sh` also starts BRO.
 
-## Local conversation
-
-Ollama must be running locally. **Detect models / diagnostics** loads installed models and appends host diagnostics to the copyable log. Select a model and speaker, enter a message in **Local conversation**, and send. The tested Pi has qwen2.5:0.5b and llama3.2:3b; default is qwen2.5:0.5b. Replies are attributed to the speaker captured when sending, even if selection changes. The camera is a preview only; frames are not sent to the text model. Messages go only to local Ollama, not a cloud service.
-
-Optional **Use local Spiralside archive** uses the existing archive search at its configured path. It is off by default. The original card IDs and metadata remain untouched. There is no model training or identity-card rewrite. Histories are bounded and stay in memory; ending a session discards pending replies and releases camera/USB. Histories remain during the current app run; closing clears them.
-
-Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mouse/keyboard, knob controls and Copy log retain their existing behavior. Joystick support and a common firmware diagnostic core remain future work; host diagnostics explicitly report that core as not implemented.
-
-## Existing bench tools
-
-SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
-
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.8.1, board firmware 0.1.0, USB protocol 1.
-
-## Conversation feedback (0.4.1)
-
-The face shows IDLE, THINKING, REPLYING or ERROR. Thinking has bouncing mouth dots; REPLYING briefly animates the mouth after text arrives (no audio/TTS). Speaker context explicitly distinguishes the selected speaker from the Architect. Model behavior still needs testing. **Clear selected speaker chat** clears only that speaker history and displayed lines, and discards a pending reply for that speaker. Other speaker histories remain. Diagnostics include selected model/speaker, local endpoint, last request model/speaker, elapsed time and errors.
-
-## Speaker face colors (0.4.2)
-
-Selecting a speaker changes the face accent: BRO mint/teal, Sky blue, Cold ice cyan, Monday pink, GRIT amber. COLOR knob adjustments are remembered per speaker for the current app run. Names and source identity cards remain unchanged.
-
-## Gamepad (0.5.0)
-
-Pi/Linux controllers exposed as `/dev/input/js*` autodetect and reconnect. Default typical Xbox mapping: left stick horizontal looks left/right, button0 next control, button1 weird burst, button4/5 previous/next speaker. Numbering varies: use **Learn next button / direction** to assign any observed button or axis direction to a named action. Select an action, learn, then press a button or move a centered stick. Learning consumes the input without triggering its action, times out after 15 seconds, and can be cancelled. Assign **None** to unbind an input. Show bindings copies them into the normal log. Restore defaults resets saved assignments.
-
-Bindings save locally to `~/.config/skycorepi/gamepad.json` across restarts. A single mapping is used for the selected controller; select a device when several are attached. Dead zone and direction latching avoid repeated actions while held. Return a stick to center before another step. Gaze stays where assigned; map Center gaze to a button if desired. Session end closes gamepad input. No rumble or motors are driven. Windows gamepad support remains future work.
-
-If USB appears in lsusb but no joystick node appears, run `ls /dev/input/js*` and check the joydev driver/desktop input permissions; do not run BRO as root. Real Xbox button numbering still needs bench validation.
-
-## Saved settings and device dashboard (0.5.1)
-
-The Devices / settings panel reports session, USB, gamepad, camera and Ollama status, with reconnect/detect buttons and Copy device diagnostics. Ollama status reflects the latest model check or chat result; Check Ollama refreshes it. Saved preferences include model, speaker, per-speaker hues, camera/gamepad selections, serial port, knob direction/edges and window geometry. Save settings explicitly or close normally to save to `~/.config/skycorepi/settings.json`. Demo mode does not read or write preferences. Camera capture is started through the preview controls, not automatically by restoring its selection. Gamepad bindings remain in their separate settings file. CLI --port overrides the saved port. Conversation text is not stored by this feature.
-
-## Local AI power (0.5.2)
-
-Run `bash install_pi.sh` once for this update. It installs a sudoers rule limited to starting/stopping `ollama.service` for your user; it validates the rule before installation. **Stop local AI** discards pending chat replies and stops Ollama. **Start local AI** restarts it for conversation. Closing BRO also attempts verified Ollama shutdown, printing the result in the terminal and saving `~/.cache/skycorepi/ai-shutdown.txt`. If service control is unavailable, loaded models are unloaded and the report explicitly says the service remains running. Shared Ollama clients are also interrupted when the service stops. Demo mode never stops Ollama. This feature does not disable Ollama's boot-time service enablement.
-
-## Look Editor (0.6.0)
-
-Top header **Look Editor** opens live theme controls: background, panels, header, text, buttons/hover/text, fields, face background, grid/scan line, eye shadows/pupils/highlights and cheeks. Pick a color for immediate preview or enter six-digit hex values and Apply. Choose installed UI, text and face fonts; UI/text sizes range from 8–24. Save persists the look with settings; normal app closing also saves the current look. Reset look restores the default theme. Speaker eye accents retain their per-speaker colors and COLOR knob adjustments. No identity cards change.
-
-Look Editor 0.6.1 replaces the obscured root Background control with **Panel Border**, visibly coloring framed panel outlines and text-box borders. Existing saved Background values migrate to Panel Border.
-
-## Vision tracking (0.7.0)
-
-Install this update with `bash install_pi.sh` to include OpenCV face cascade data. Enable Camera preview, then choose **Face** or **Motion** below its controls. Face uses a frontal-face Haar detector; Motion uses background differences for a stationary camera. A box and target crosshair show observations; the largest initial target is selected, then the closest target center. This is basic target continuity, not identity recognition. Face detection may miss profiles, small faces or poor lighting.
-
-**Eyes follow target** smoothly controls pupils in both axes. On losing a target, gaze holds briefly then centers. Manual gaze inputs can compete with tracking; disable Eyes follow target to use manual gaze. Some stylized expressions override horizontal pupil position. **Tracking overlay** hides/shows marks. Vision off keeps plain preview. Frame capture remains shared with preview in its existing child process; detection runs about five times a second on reduced frames. Diagnostics show searching/tracking, target count and detection time; only state transitions are logged. Camera stops on hide/session end/app close. No recording, identification, cloud inference, chat image input or motor commands are added. Object/hand/marker modes remain later additions. Real Pi camera tracking needs testing.
-
-Camera direction (0.7.1): **Invert gaze X (left / right)** reverses only camera-driven horizontal eye movement. It starts enabled for a camera facing you. Toggle it while moving left/right to match your setup; the choice saves immediately and loads next launch. The preview and tracking overlay retain the original camera orientation.
-
-## Camera controls and hand signals (0.8.0)
-
-Camera mode, overlay, eye following, inversion, response, movement range, and lost-target center delay now save as you adjust them and restore on launch. Camera visibility remains a deliberate user choice. The preview reports delivered capture FPS, target count, detection time, and searching/tracking/errors. FPS includes capture, processing and preview work, not the webcam's advertised rate.
-
-For hand recognition, close BRO and run:
+For optional hand recognition, run once:
 
 ```bash
 bash apps/BRO/install_vision.sh
 python3 app.py --port /dev/ttyACM0
 ```
 
-The optional installer creates a separate MediaPipe 1.0.1 runtime and downloads Google's version-1 gesture model. Face/Motion/plain preview continue without it. Select **Hands** in Camera, then enable **gesture actions**. Choose a signal and action and press **Assign signal → action**; choose **None** to unassign. Bindings, confidence and hold time save immediately. Actions start disabled on every launch. Recognition and landmarks stay on this computer.
+The vision installer creates a separate runtime, installs MediaPipe 1.0.1, downloads Google's version-1 gesture model, checks its SHA256, and verifies it loads. Face/Motion/plain preview work without this optional runtime. Existing vision installations do not need reinstalling for 0.8.1.
 
-Supported static signals: Open_Palm, Closed_Fist, Thumb_Up, Thumb_Down, Victory (peace), Pointing_Up and ILoveYou. A signal must exceed confidence and remain stable for the hold duration. After firing, lower the hand for at least 0.4 seconds before another action; changing signals alone does not re-arm. Stalled frames do not count as a hold/release. No wave or left/right pointing classifier is claimed. Eye following competes with manual gaze actions; disable it when assigning Look left/right.
+App **0.8.1**, encoder firmware **BloomFace 0.1.0**, USB protocol **1**. No board reflash is needed for these desktop updates.
 
-Source: [Google MediaPipe Gesture Recognizer Python guide](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer/python). Camera remains stoppable and local. This release does not add voice synthesis, Architect enrollment, recording, chat vision or motor control.
+## Current capabilities
 
-0.8.1 fixes multiprocessing overwriting the vision venv package path when BRO starts from system Python. Existing vision installations need only git pull and an app restart. Camera now has a direct Copy camera / vision status button.
+| Area | Available now |
+| --- | --- |
+| Face | Twelve expressions, gaze, energy, color, blinking, weird bursts, fullscreen |
+| Speakers | BRO, Sky, Cold, Monday, GRIT; individual face accents and chat histories |
+| Controls | USB rotary encoder, keyboard/mouse, Linux USB gamepad with action learning/unbinding |
+| Local AI | Ollama model detection, attributed replies, request timing, Start/Stop local AI |
+| Camera | USB autodetection, device selection/rescan, live preview, explicit stop |
+| Vision | Off, Face, Motion, Hands; overlay, eye following, horizontal inversion |
+| Tracking controls | Saved smoothing/response, gaze range, lost-target centering delay |
+| Hand signals | Seven static poses, saved action assignments, confidence/hold controls, release protection |
+| Appearance | Live Look Editor for panel borders, panels, buttons, fields, face details, fonts |
+| Diagnostics | Device dashboard, activity/chat logs, Copy device diagnostics, Copy camera / vision status |
+
+See the [BRO usage, wiring, and troubleshooting guide](apps/BRO/README.md) for the controls and setup details.
+
+## Verified on the Architect's Pi
+
+The workstation is a Raspberry Pi 5 with 16 GB RAM, Debian 12/bookworm, and Python 3.11.2. The encoder board is an ESP32-S3 over `/dev/ttyACM0`; the camera is an Arducam 8MP USB device with working capture on `/dev/video0`; the controller is an Xbox 360 USB gamepad on `/dev/input/js0`. Device node numbers can change.
+
+Confirmed during the October 3, 2026 bench session:
+
+- Encoder, button, keyboard/mouse controls, gamepad action assignment and unassignment work.
+- Local Ollama replies work with the installed models; one qwen2.5:0.5b reply took about 35 seconds. Timing depends on workload and model.
+- Speaker face colors, Look Editor, and saved preferences work.
+- Stop local AI reports the local endpoint offline on the Pi.
+- USB camera preview and motion tracking work.
+- Hands mode detects/tracks a hand and the Architect reports all seven named signals working. One observation showed 9.4 preview FPS and 103.5 ms processing time; this is an observation, not a guaranteed rate.
+- Removing the hand from view allows the next gesture command to fire.
+
+The basic frontal-face detector did not reliably find the Architect wearing glasses and a hat. Stronger detection and Architect enrollment remain future work. Closing BRO requests verified Ollama shutdown, but the separate close-path behavior has not been independently bench-confirmed here.
+
+## Sessions, local AI, and storage
+
+Ollama runs at `http://127.0.0.1:11434`. The tested Pi has `qwen2.5:0.5b` and `llama3.2:3b`; the default is the smaller model. Use **Start local AI** when it is stopped. **Stop local AI** discards pending replies and attempts to stop `ollama.service`. Closing BRO also attempts shutdown; if it can only unload models, it reports that the service remains running. The installer grants narrowly limited service start/stop permissions. Ollama's boot-time enablement is unchanged.
+
+Ending a session releases the camera/USB/gamepad and rejects pending replies. Existing conversation histories remain until the app closes or a selected speaker's history is cleared. Camera frames are processed locally and are not sent to the text model. There is no recording or voice synthesis in this release.
+
+Settings live in `~/.config/skycorepi/settings.json`; gamepad bindings live separately in `~/.config/skycorepi/gamepad.json`. Camera controls and gesture assignments save immediately. Other preferences save with **Save settings** or normal closing. Gesture actions start disabled on every launch. Conversation text is not saved by this settings feature. Demo mode skips saved preferences and never stops Ollama.
+
+The optional Spiralside archive toggle is off by default. Its configured archive location was not found on the tested Pi; original identity cards still load normally.
+
+## Sign Bank plan — not implemented
+
+The next larger vision project is an ASL Sign Bank: browse a sign and its example, see whether BRO can recognize it, and eventually map supported signs to text or actions. The current seven-pose recognizer is not an ASL translator. A dictionary/reference bank alone does not add recognition; moving signs need sequence-aware recognition and separate testing.
+
+Resources investigated:
+
+- [ASL-LEX](https://asl-lex.org/): sign reference videos and lexical information.
+- [ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/): isolated-sign video research dataset.
+- [ASL Citizen code and research checkpoints](https://github.com/microsoft/ASL-citizen-code): candidates to investigate; not yet integrated or benchmarked on this Pi.
+- [MediaPipe Gesture Recognizer](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer/python): the current static hand-pose foundation.
+
+Start with a small chosen vocabulary and measure it on the actual camera. Keep reference-only entries distinct from supported recognition. Custom moving signs, full signed sentences, voice output, and Architect recognition are future work. Bright removable markers on glasses could be a separate color-tracking experiment; no marker tracker exists yet.
+
+## Shared diagnostics direction
+
+The intended long-term architecture is a consistent board diagnostic core across our flashed boards: versioned identity/handshake, capabilities, pin profiles, and copyable health reports. That firmware core is **not implemented**. Current BRO uses BloomFace protocol 1 and host-side diagnostics; it does not install a separate hidden BIOS or bootloader.
+
+## Existing tools and compatibility
+
+SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame, and project archives remain under their original paths. `characters/` and `source/spiralside/` remain intact. The old main home/chat UI has been replaced by BRO; `app_test.py` remains a legacy reference.
+
+The USB plug watcher identifies BloomFace firmware before launching BRO and shares the singleton lock with the older BloomFace app. The installer disables the old BloomFace autostart watcher before installing BRO's watcher. Closing BRO leaves the plug watcher available for a later unplug/replug.
+
+## Development checks
+
+```bash
+python3 -m unittest discover -s apps/BRO/tests -v
+xvfb-run -a python3 apps/BRO/tests/gui_smoke.py
+python3 -m py_compile app.py apps/BRO/*.py
+```
+
+GitHub Actions additionally installs the optional vision runtime and runs real-model blank-frame/thumbs-up tests plus a system-Python-parent / vision-venv-child regression test. The 0.8.1 checks passed; 33 tests are discovered, with environment-specific integrations skipped outside their configured run. Tests do not establish recognition accuracy across people, lighting, or camera positions.
