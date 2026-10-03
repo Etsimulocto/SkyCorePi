@@ -32,7 +32,10 @@ class AudioEngine:
                         proc.stdin.write(json.dumps(request)+'\n');proc.stdin.flush()
                         if self.finish_requested:proc.stdin.write('stop\n');proc.stdin.flush()
                     timeout=35 if request['operation']=='listen' else 120 if request['operation']=='speak' else 15
-                    timer=threading.Timer(timeout,lambda:proc.kill() if proc.poll() is None else None);timer.start()
+                    timed_out=threading.Event()
+                    def expire():
+                        if proc.poll() is None:timed_out.set();proc.kill()
+                    timer=threading.Timer(timeout,expire);timer.start()
                     reported=False
                     try:
                         for line in proc.stdout:
@@ -41,7 +44,7 @@ class AudioEngine:
                             self.events.put((epoch,event))
                         code=proc.wait()
                         if code and not reported:
-                            errors.seek(0);self.events.put((epoch,dict(kind='error',text='Audio worker stopped: '+errors.read()[-2000:])))
+                            errors.seek(0);self.events.put((epoch,dict(kind='error',text=(f'Audio timed out after {timeout} seconds: ' if timed_out.is_set() else 'Audio worker stopped: ')+errors.read()[-2000:])))
                     finally:timer.cancel()
             except Exception as exc:self.events.put((epoch,dict(kind='error',text=str(exc))))
             finally:

@@ -78,3 +78,15 @@ class EngineTests(unittest.TestCase):
                     self.assertNotEqual(epoch,engine.epoch)
                     self.assertIsNotNone(process.poll())
                 finally:engine.cancel()
+
+class OutputTests(unittest.TestCase):
+    def test_mono_voice_becomes_stereo_at_device_rate(self):
+        try:import numpy as np
+        except ImportError:self.skipTest('NumPy runs in audio integration environment')
+        from audio_worker import prepare_output
+        source=np.full(2205,1234,dtype=np.int16)
+        data=prepare_output(source.tobytes(),22050,48000,1,2)
+        frames=np.frombuffer(data,dtype=np.int16).reshape(-1,2)
+        self.assertEqual(len(frames),4800)
+        self.assertTrue(np.all(frames[:,0]==frames[:,1]))
+        self.assertTrue(np.all(frames==1234))

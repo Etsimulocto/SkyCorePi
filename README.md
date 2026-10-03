@@ -103,7 +103,7 @@ xvfb-run -a python3 apps/BRO/tests/gui_smoke.py
 python3 -m py_compile app.py apps/BRO/*.py
 ```
 
-GitHub Actions additionally installs the optional vision runtime and runs real-model blank-frame/thumbs-up tests plus a system-Python-parent / vision-venv-child regression test. The 0.8.1 checks passed before the audio addition; the 0.9.0 suite discovers 41 tests, with environment-specific integrations skipped outside their configured run. Tests do not establish recognition accuracy across people, lighting, or camera positions.
+GitHub Actions additionally installs the optional vision runtime and runs real-model blank-frame/thumbs-up tests plus a system-Python-parent / vision-venv-child regression test. The 0.8.1 checks passed before the audio addition; the 0.9.0 suite discovers 42 tests, with environment-specific integrations skipped outside their configured run. Tests do not establish recognition accuracy across people, lighting, or camera positions.
 
 ## Local voice and microphone (0.9.0)
 

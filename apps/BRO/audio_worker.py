@@ -47,6 +47,16 @@ def transcribe_chunks(chunks,recognizer):
     if final:parts.append(final)
     return ' '.join(parts)
 
+def prepare_output(data,source_rate,target_rate,source_channels,target_channels):
+    import numpy as np
+    samples=np.frombuffer(data,dtype=np.int16).reshape(-1,source_channels)
+    if source_rate!=target_rate and len(samples):
+        count=max(1,round(len(samples)*target_rate/source_rate))
+        positions=np.arange(count)*source_rate/target_rate
+        samples=np.stack([np.interp(positions,np.arange(len(samples)),samples[:,i]) for i in range(source_channels)],axis=1).astype(np.int16)
+    if source_channels==1 and target_channels==2:samples=np.repeat(samples,2,axis=1)
+    return samples.astype(np.int16).tobytes()
+
 def speak(request,sd):
     from piper import PiperVoice,SynthesisConfig
     import numpy as np
@@ -58,13 +68,17 @@ def speak(request,sd):
     emit('status',text='Loading voice: '+voice)
     engine=PiperVoice.load(str(path))
     config=SynthesisConfig(volume=float(request['volume']),length_scale=1/float(request['speed']))
-    stream=None
+    output_info=sd.query_devices(device)
+    output_rate=int(output_info['default_samplerate'])
+    stream=None;output_channels=None
     try:
         for chunk in engine.synthesize(request['text'][:4000],syn_config=config):
             if stream is None:
-                stream=sd.RawOutputStream(device=device,samplerate=chunk.sample_rate,channels=chunk.sample_channels,dtype='int16')
+                output_channels=2 if chunk.sample_channels==1 and output_info['max_output_channels']>=2 else chunk.sample_channels
+                stream=sd.RawOutputStream(device=device,samplerate=output_rate,channels=output_channels,dtype='int16')
                 stream.start();emit('status',text='Speaking · '+str(sd.query_devices(device)['name']))
-            stream.write(chunk.audio_int16_bytes)
+            data=prepare_output(chunk.audio_int16_bytes,chunk.sample_rate,output_rate,chunk.sample_channels,output_channels)
+            stream.write(data)
         if stream is not None:stream.stop()
     finally:
         if stream is not None:stream.close()
