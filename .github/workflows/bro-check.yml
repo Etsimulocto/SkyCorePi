@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y python3-tk python3-serial python3-pil xvfb
+      - run: sudo apt-get update && sudo apt-get install -y python3-tk python3-serial python3-pil python3-opencv opencv-data xvfb
       - run: python3 -m unittest discover -s apps/BRO/tests -v
       - run: xvfb-run -a python3 apps/BRO/tests/gui_smoke.py
       - run: python3 -m py_compile app.py apps/BRO/*.py
