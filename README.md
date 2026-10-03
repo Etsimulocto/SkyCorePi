@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.5.2
+# SkyCorePi / BRO 0.6.0
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,7 +27,7 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.5.2, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.6.0, board firmware 0.1.0, USB protocol 1.
 
 ## Conversation feedback (0.4.1)
 
@@ -52,3 +52,7 @@ The Devices / settings panel reports session, USB, gamepad, camera and Ollama st
 ## Local AI power (0.5.2)
 
 Run `bash install_pi.sh` once for this update. It installs a sudoers rule limited to starting/stopping `ollama.service` for your user; it validates the rule before installation. **Stop local AI** discards pending chat replies and stops Ollama. **Start local AI** restarts it for conversation. Closing BRO also attempts verified Ollama shutdown, printing the result in the terminal and saving `~/.cache/skycorepi/ai-shutdown.txt`. If service control is unavailable, loaded models are unloaded and the report explicitly says the service remains running. Shared Ollama clients are also interrupted when the service stops. Demo mode never stops Ollama. This feature does not disable Ollama's boot-time service enablement.
+
+## Look Editor (0.6.0)
+
+Top header **Look Editor** opens live theme controls: background, panels, header, text, buttons/hover/text, fields, face background, grid/scan line, eye shadows/pupils/highlights and cheeks. Pick a color for immediate preview or enter six-digit hex values and Apply. Choose installed UI, text and face fonts; UI/text sizes range from 8–24. Save persists the look with settings; normal app closing also saves the current look. Reset look restores the default theme. Speaker eye accents retain their per-speaker colors and COLOR knob adjustments. No identity cards change.

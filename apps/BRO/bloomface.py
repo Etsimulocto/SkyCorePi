@@ -16,9 +16,10 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.5.2"
+VERSION="0.6.0"
 from console import Console
 from preferences import Preferences
+from appearance import Appearance
 
 
 def instance_lock():
@@ -86,13 +87,14 @@ class App:
         style.configure("TFrame",background="#0d1727")
         style.configure("TLabel",background="#0d1727",foreground="#c7d3e9")
         style.configure("TButton",padding=7)
-        top=ttk.Frame(root,padding=12);top.pack(fill="x")
-        ttk.Label(top,text="BRO",font=("Sans",19,"bold")).pack(side="left",padx=(0,15))
+        top=ttk.Frame(root,padding=12,style="Header.TFrame");top.pack(fill="x")
+        ttk.Label(top,text="BRO",style="Header.TLabel",font=("Sans",19,"bold")).pack(side="left",padx=(0,15))
         self.port=ttk.Combobox(top,width=18);self.port.pack(side="left")
         ttk.Button(top,text="Refresh",command=self.refresh).pack(side="left",padx=4)
         ttk.Button(top,text="Connect",command=self.connect).pack(side="left")
         ttk.Button(top,text="Disconnect",command=self.disconnect).pack(side="left",padx=4)
         ttk.Button(top,text="Fullscreen [F]",command=self.toggle_fullscreen).pack(side="right")
+        ttk.Button(top,text="Look Editor",command=lambda:self.appearance.open()).pack(side="right",padx=6)
         self.status=tk.StringVar(value="DEMO · keyboard/mouse control" if demo else "Plug in the rotary board and Connect")
         ttk.Label(root,textvariable=self.status,padding=(12,7)).pack(fill="x")
         self.console=Console(self)
@@ -125,12 +127,15 @@ class App:
         root.bind("f",lambda e:self.keyboard(e,self.toggle_fullscreen))
         root.bind("<Escape>",lambda _:self.leave_fullscreen())
         root.protocol("WM_DELETE_WINDOW",self.close)
+        self.appearance=Appearance(self)
+        self.appearance.apply()
         self.refresh();self.load_preferences();self.log("Session started"+(" DEMO" if demo else ""));self.frame()
 
     def load_preferences(self):
         self.preferences=Preferences()
         if self.demo:return
         data=self.preferences.load()
+        self.appearance.load(data.get("appearance",{}))
         c=self.console
         c.speaker_hues.update(data.get('hues',{}))
         speaker=data.get('speaker','BRO')
@@ -146,7 +151,7 @@ class App:
     def save_preferences(self):
         if self.demo:return
         c=self.console;c.speaker_hues[c.speaker.get()]=self.face.hue
-        data=dict(model=c.chat.model.get(),camera=c.camera_feed.source.get(),gamepad=c.gamepad.device.get(),port=self.port.get(),speaker=c.speaker.get(),hues=c.speaker_hues,detent=self.detent.get(),reverse=self.reverse.get(),geometry=self.root.geometry())
+        data=dict(appearance=self.appearance.values,model=c.chat.model.get(),camera=c.camera_feed.source.get(),gamepad=c.gamepad.device.get(),port=self.port.get(),speaker=c.speaker.get(),hues=c.speaker_hues,detent=self.detent.get(),reverse=self.reverse.get(),geometry=self.root.geometry())
         try:self.preferences.save(data);self.log('Settings saved')
         except OSError as exc:self.log('Settings save error: '+str(exc))
 
@@ -232,18 +237,19 @@ class App:
         scale=min(w/1200,h/680);ox=(w-1200*scale)/2;oy=(h-680*scale)/2
         f=self.face;name=MOODS[f.mood]
         rgb=colorsys.hls_to_rgb(f.hue,0.65,0.85);accent="#"+"".join(f"{int(v*255):02x}" for v in rgb)
-        dark="#13243a";bright="#d7fff6"
+        look=self.appearance.values
+        dark=look["eye_shadow"];bright=look["eye_highlight"]
         def line(*pts,**kw):return c.create_line(*pts,tags="face",**kw)
         def oval(*pts,**kw):return c.create_oval(*pts,tags="face",**kw)
         def rect(*pts,**kw):return c.create_rectangle(*pts,tags="face",**kw)
         def text(x,y,s,**kw):return c.create_text(x,y,text=s,tags="face",**kw)
         # Subtle CRT grid and moving scan line.
-        for x in range(60,1200,60):line(x,35,x,640,fill="#0e192a")
-        for y in range(40,660,40):line(45,y,1155,y,fill="#0e192a")
-        sy=50+(t*28)%570;line(60,sy,1140,sy,fill="#14263b",width=2)
+        for x in range(60,1200,60):line(x,35,x,640,fill=look["grid"])
+        for y in range(40,660,40):line(45,y,1155,y,fill=look["grid"])
+        sy=50+(t*28)%570;line(60,sy,1140,sy,fill=look["scan_line"],width=2)
         for x,y,sx,sy2 in ((45,45,1,1),(1155,45,-1,1),(45,635,1,-1),(1155,635,-1,-1)):
             line(x+sx*55,y,x,y,x,y+sy2*45,fill=accent,width=3)
-        text(600,73,"B R O  /  "+self.console.speaker.get(),fill="#5f789b",font=("Monospace",13,"bold"))
+        text(600,73,"B R O  /  "+self.console.speaker.get(),fill=look["muted"],font=(look["face_font"],13,"bold"))
         # Ambient motion is procedural; no AI/image assets or external services.
         bob=math.sin(t*(1+f.energy*3))*7*f.energy
         blink=1.0
@@ -266,22 +272,22 @@ class App:
             for k in (12,6):oval(cx-ew-k,ey-eh-k,cx+ew+k,ey+eh+k,outline=dark,width=5)
             oval(cx-ew,ey-eh,cx+ew,ey+eh,fill=accent,outline=accent,width=2)
             if name=="JOY":
-                line(cx-85,ey+10,cx-45,ey-30,cx,ey-45,cx+45,ey-30,cx+85,ey+10,fill="#071220",width=17,smooth=True)
+                line(cx-85,ey+10,cx-45,ey-30,cx,ey-45,cx+45,ey-30,cx+85,ey+10,fill=look["pupils"],width=17,smooth=True)
             elif name=="LOVESTRUCK":
                 points=[]
                 for k in range(41):
                     a=k*math.tau/40
                     points.extend((cx+4*(16*math.sin(a)**3),ey-4*(13*math.cos(a)-5*math.cos(2*a)-2*math.cos(3*a)-math.cos(4*a))))
-                c.create_polygon(*points,fill="#071220",outline="",tags="face")
+                c.create_polygon(*points,fill=look["pupils"],outline="",tags="face")
             elif name=="VOID":
-                oval(cx-105,ey-eh+9,cx+105,ey+eh-9,fill="#060b15",outline="")
+                oval(cx-105,ey-eh+9,cx+105,ey+eh-9,fill=look["face_background"],outline="")
                 oval(cx-7+gx,ey-6,cx+7+gx,ey+6,fill=bright,outline="")
             elif name=="DISCO":
-                line(cx-55+gx,ey-40+gy,cx+55+gx,ey+40+gy,fill="#071220",width=18)
-                line(cx-55+gx,ey+40+gy,cx+55+gx,ey-40+gy,fill="#071220",width=18)
+                line(cx-55+gx,ey-40+gy,cx+55+gx,ey+40+gy,fill=look["pupils"],width=18)
+                line(cx-55+gx,ey+40+gy,cx+55+gx,ey-40+gy,fill=look["pupils"],width=18)
             else:
                 ph=min(54,eh*0.76)
-                oval(cx-38+gx,ey-ph+gy*blink,cx+38+gx,ey+ph+gy*blink,fill="#071220",outline="")
+                oval(cx-38+gx,ey-ph+gy*blink,cx+38+gx,ey+ph+gy*blink,fill=look["pupils"],outline="")
                 if eh>28:oval(cx-18+gx,ey-ph+12,cx-4+gx,ey-ph+26,fill=bright,outline="")
             if name in ("STUBBORN","GREMLIN","SUSPICIOUS"):
                 slope=35 if idx==0 else -35
@@ -291,7 +297,7 @@ class App:
                     xx=cx-70+j*70;length=30+25*(1+math.sin(t*2+j+idx))
                     line(xx,ey+eh-8,xx,ey+eh+length,fill=accent,width=15,capstyle=tk.ROUND)
         phase=self.console.chat.phase
-        text(600,110,phase+(" / "+self.console.chat.pending if self.console.chat.pending else ""),fill=accent,font=("Monospace",12,"bold"))
+        text(600,110,phase+(" / "+self.console.chat.pending if self.console.chat.pending else ""),fill=accent,font=(look["face_font"],12,"bold"))
         my=478+bob
         if phase=="REPLYING":
             opening=12+abs(math.sin(t*9))*35
@@ -303,7 +309,7 @@ class App:
         elif name=="PANIC":oval(557,my-35,643,my+55,outline=accent,width=10)
         elif name=="SLEEPY":
             line(510,my,690,my,fill=accent,width=8,capstyle=tk.ROUND)
-            text(1000,175,"z"*(1+int(t)%3),fill=accent,font=("Monospace",25))
+            text(1000,175,"z"*(1+int(t)%3),fill=accent,font=(look["face_font"],25))
         elif name=="VOID":line(576,my,624,my,fill=accent,width=3)
         elif name=="GREMLIN":
             line(485,my-10,530,my+25,575,my-5,620,my+25,665,my-5,710,my+20,fill=accent,width=9)
@@ -314,7 +320,7 @@ class App:
             depth=60 if name in ("JOY","LOVESTRUCK","DISCO") else 18
             line(490,my-10,535,my+depth,600,my+depth+6,665,my+depth,710,my-10,fill=accent,width=9,smooth=True,capstyle=tk.ROUND)
         if name in ("JOY","LOVESTRUCK"):
-            for cx in (250,950):line(cx-22,415,cx+22,415,fill="#e992b8",width=8,capstyle=tk.ROUND)
+            for cx in (250,950):line(cx-22,415,cx+22,415,fill=look["cheeks"],width=8,capstyle=tk.ROUND)
         # Long press creates an expanding orbit of little sparks.
         burst=t-self.burst_at
         if 0<=burst<1.3:
@@ -323,13 +329,13 @@ class App:
                 xx=600+math.cos(a)*r;yy=340+math.sin(a)*r*0.7
                 line(xx-7,yy,xx+7,yy,fill=accent,width=3)
                 line(xx,yy-7,xx,yy+7,fill=accent,width=3)
-        text(600,598,name,fill=accent,font=("Monospace",21,"bold"))
-        text(600,632,f"ENERGY {int(f.energy*100):02d}%   /   CONTROL: {CONTROLS[f.control]}",fill="#6a83a6",font=("Monospace",12))
+        text(600,598,name,fill=accent,font=(look["face_font"],21,"bold"))
+        text(600,632,f"ENERGY {int(f.energy*100):02d}%   /   CONTROL: {CONTROLS[f.control]}",fill=look["muted"],font=(look["face_font"],12))
         c.scale("face",0,0,scale,scale);c.move("face",ox,oy)
         # Canvas scale does not scale font glyphs; set proportional font sizes.
         for item in c.find_withtag("face"):
             if c.type(item)=="text":
-                current=c.itemcget(item,"font").split()
+                current=c.tk.splitlist(c.itemcget(item,"font"))
                 if len(current)>=2:
                     try:c.itemconfigure(item,font=(current[0],max(7,int(float(current[1])*scale)),*current[2:]))
                     except ValueError:pass

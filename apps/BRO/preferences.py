@@ -16,6 +16,8 @@ class Preferences:
         if data.get('detent') in ('2','4'):clean['detent']=data['detent']
         if type(data.get('reverse')) is bool:clean['reverse']=data['reverse']
         if isinstance(data.get('geometry'),str) and re.fullmatch(r'\d{3,4}x\d{3,4}(?:[+-]\d+[+-]\d+)?',data['geometry']):clean['geometry']=data['geometry']
+        from appearance import validate
+        clean["appearance"]=validate(data.get("appearance",{}))
         hues=data.get('hues',{})
         if isinstance(hues,dict):clean['hues']={k:v for k,v in hues.items() if k in ('BRO','Sky','Cold','Monday','GRIT') and type(v) in (int,float) and math.isfinite(v) and 0<=v<1}
         return clean
