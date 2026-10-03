@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.6.0"
+VERSION="0.6.1"
 from console import Console
 from preferences import Preferences
 from appearance import Appearance

@@ -97,17 +97,17 @@ if __name__=="__main__":
     dashboard.copy();assert "Chat diagnostics:" in root.clipboard_get()
     look=app.appearance
     look.open();root.update()
-    look.variables["background"].set("#221133")
+    look.variables["panel_border"].set("#221133")
     look.variables["face_background"].set("#112233")
     look.variables["button"].set("#334455")
     look.variables["ui_size"].set("13")
     look.variables["face_font"].set("DejaVu Sans")
     assert look.update()
-    assert app.root.cget("bg")=="#221133" and app.canvas.cget("bg")=="#112233"
+    assert app.console.draft.cget("highlightbackground")=="#221133" and app.canvas.cget("bg")=="#112233"
     from tkinter import ttk
     assert ttk.Style().lookup("TButton","background")=="#334455"
     app.draw(3.0);root.update()
-    look.variables["background"].set("broken");assert not look.update()
+    look.variables["panel_border"].set("broken");assert not look.update()
     look.reset();look.window.destroy()
     app.face.mood=0;app.draw(3.0);root.update()
     try:

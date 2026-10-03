@@ -3,12 +3,13 @@ import re
 import tkinter as tk
 from tkinter import ttk,colorchooser,font
 
-COLORS={'background':'#060b15','panels':'#0d1727','header':'#0d1727','text':'#c7d3e9','muted':'#6a83a6','button':'#24354b','button_text':'#d7fff6','button_hover':'#345571','fields':'#13243a','field_text':'#d7fff6','face_background':'#060b15','grid':'#0e192a','scan_line':'#14263b','eye_shadow':'#13243a','pupils':'#071220','eye_highlight':'#d7fff6','cheeks':'#e992b8'}
+COLORS={'panel_border':'#345571','panels':'#0d1727','header':'#0d1727','text':'#c7d3e9','muted':'#6a83a6','button':'#24354b','button_text':'#d7fff6','button_hover':'#345571','fields':'#13243a','field_text':'#d7fff6','face_background':'#060b15','grid':'#0e192a','scan_line':'#14263b','eye_shadow':'#13243a','pupils':'#071220','eye_highlight':'#d7fff6','cheeks':'#e992b8'}
 DEFAULTS={**COLORS,'ui_font':'Sans','ui_size':11,'text_font':'Monospace','text_size':11,'face_font':'Monospace'}
 
 def validate(data):
     if not isinstance(data,dict):return {}
     result={}
+    if 'panel_border' not in data and 'background' in data:data={**data,'panel_border':data['background']}
     for key in COLORS:
         if isinstance(data.get(key),str) and re.fullmatch(r'#[0-9a-fA-F]{6}',data[key]):result[key]=data[key]
     for key in ('ui_font','text_font','face_font'):
@@ -23,12 +24,14 @@ class Appearance:
     def load(self,data):self.values={**DEFAULTS,**validate(data)};self.apply()
     def apply(self):
         v=self.values;r=self.app.root;s=ttk.Style(r)
-        r.configure(bg=v['background'])
+        r.configure(bg=v['panels'])
         ui=(v['ui_font'],v['ui_size'])
         for name in ('TFrame','TLabelframe','TLabelframe.Label','TLabel','TCheckbutton'):
             s.configure(name,background=v['panels'])
         for name in ('TLabel','TLabelframe.Label','TCheckbutton'):
             s.configure(name,foreground=v['text'],font=ui)
+        s.configure('TLabelframe',bordercolor=v['panel_border'],lightcolor=v['panel_border'],darkcolor=v['panel_border'],borderwidth=2,relief='solid')
+        s.configure('TPanedwindow',background=v['panel_border'])
         s.configure('Header.TFrame',background=v['header']);s.configure('Header.TLabel',background=v['header'],foreground=v['text'])
         s.configure('TButton',background=v['button'],foreground=v['button_text'],font=ui)
         s.map('TButton',background=[('active',v['button_hover']),('disabled',v['panels'])],foreground=[('disabled',v['muted'])])
@@ -39,7 +42,7 @@ class Appearance:
         s.map('TCheckbutton',background=[('active',v['panels'])],foreground=[('active',v['text'])])
         def walk(widget):
             for child in widget.winfo_children():
-                if isinstance(child,tk.Text):child.configure(bg=v['fields'],fg=v['field_text'],insertbackground=v['field_text'],selectbackground=v['button_hover'],font=(v['text_font'],v['text_size']))
+                if isinstance(child,tk.Text):child.configure(highlightthickness=2,highlightbackground=v['panel_border'],highlightcolor=v['panel_border'],bg=v['fields'],fg=v['field_text'],insertbackground=v['field_text'],selectbackground=v['button_hover'],font=(v['text_font'],v['text_size']))
                 elif isinstance(child,tk.Canvas):child.configure(bg=v['panels'])
                 elif isinstance(child,ttk.Label):
                     try:weight=font.Font(font=child.cget('font')).actual('weight')
