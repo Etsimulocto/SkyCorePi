@@ -53,6 +53,22 @@ if __name__=="__main__":
     app.console.toggle_session();app.face.control=0;app.turn(1)
     assert app.face.mood!=before[0]
     assert app.face.detent==2
+    app.console.speaker.set("Sky")
+    with patch.object(chat,"worker"):
+        chat.entry.insert("1.0","hello");chat.send()
+    assert chat.phase=="THINKING"
+    app.console.speaker.set("Monday")
+    chat.events.put((chat.epoch,"reply",("Sky","hello","Hello Architect!",[]),None));chat.poll()
+    assert chat.phase=="REPLYING" and "Sky [local AI]: Hello Architect!" in app.console.speech.get("1.0","end")
+    chat.backend.commit("Monday","hi","hey")
+    app.console.speaker.set("Sky");chat.clear_selected()
+    assert chat.backend.histories["Sky"]==[] and chat.backend.histories["Monday"]
+    chat.phase_until=0;chat.poll();assert chat.phase=="IDLE"
+    with patch.object(chat,"worker"):
+        chat.entry.insert("1.0","retry");chat.send()
+    chat.events.put((chat.epoch,"reply",None,"connection refused"));chat.poll()
+    assert chat.phase=="ERROR" and not chat.busy
+    assert "connection refused" in chat.diagnostic_summary()
     app.console.camera_visible.set(False);app.console.toggle_camera()
     app.console.speaker.set("BRO")
     app.face.mood=0;app.draw(3.0);root.update()

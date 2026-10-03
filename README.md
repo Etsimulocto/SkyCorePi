@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.4.0
+# SkyCorePi / BRO 0.4.1
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,4 +27,8 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.4.0, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.4.1, board firmware 0.1.0, USB protocol 1.
+
+## Conversation feedback (0.4.1)
+
+The face shows IDLE, THINKING, REPLYING or ERROR. Thinking has bouncing mouth dots; REPLYING briefly animates the mouth after text arrives (no audio/TTS). Speaker context explicitly distinguishes the selected speaker from the Architect. Model behavior still needs testing. **Clear selected speaker chat** clears only that speaker history and displayed lines, and discards a pending reply for that speaker. Other speaker histories remain. Diagnostics include selected model/speaker, local endpoint, last request model/speaker, elapsed time and errors.

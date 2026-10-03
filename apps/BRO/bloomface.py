@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.4.0"
+VERSION="0.4.1"
 from console import Console
 
 
@@ -266,8 +266,17 @@ class App:
                 for j in range(3):
                     xx=cx-70+j*70;length=30+25*(1+math.sin(t*2+j+idx))
                     line(xx,ey+eh-8,xx,ey+eh+length,fill=accent,width=15,capstyle=tk.ROUND)
+        phase=self.console.chat.phase
+        text(600,110,phase+(" / "+self.console.chat.pending if self.console.chat.pending else ""),fill=accent,font=("Monospace",12,"bold"))
         my=478+bob
-        if name=="PANIC":oval(557,my-35,643,my+55,outline=accent,width=10)
+        if phase=="REPLYING":
+            opening=12+abs(math.sin(t*9))*35
+            oval(545,my-opening,655,my+opening,outline=accent,width=7)
+        elif phase=="THINKING":
+            for k in range(3):
+                yy=my-8*math.sin(t*5+k)
+                oval(570+k*30,yy-5,580+k*30,yy+5,fill=accent,outline="")
+        elif name=="PANIC":oval(557,my-35,643,my+55,outline=accent,width=10)
         elif name=="SLEEPY":
             line(510,my,690,my,fill=accent,width=8,capstyle=tk.ROUND)
             text(1000,175,"z"*(1+int(t)%3),fill=accent,font=("Monospace",25))

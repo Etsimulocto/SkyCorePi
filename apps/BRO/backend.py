@@ -29,7 +29,7 @@ class Backend:
             card=json.loads(path.read_text())
             if card['identity']['name']!=speaker:raise ValueError('Identity card mismatch: '+speaker)
             identity='Preserve this identity card and its identifiers. Speak as '+speaker+'.\n'+json.dumps(card,ensure_ascii=False)
-        return identity+'\nYou run locally in SkyCorePi. Preserve distinct identities. Do not invent memories or claim physical actions, vision, or tool access. Camera preview is not supplied to this text model. Reply in plain concise text.'
+        return f'You are {speaker}. The human speaking to you is the Architect (quarterbitgames). Address the human as Architect, never as {speaker}. When they greet {speaker}, they are greeting YOU. Reply directly as yourself; do not write both sides of the conversation.\n'+identity+'\nYou run locally in SkyCorePi. Preserve distinct identities. Do not invent memories or claim physical actions, vision, or tool access. Camera preview is not supplied to this text model. Reply in plain concise text.'
 
     def prepare(self,speaker,text,archive=False):
         prompt=self.prompt(speaker)
