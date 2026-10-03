@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.6.1"
+VERSION="0.7.0"
 from console import Console
 from preferences import Preferences
 from appearance import Appearance
@@ -255,7 +255,7 @@ class App:
         blink=1.0
         elapsed=t-self.blink_at
         if 0<=elapsed<0.22:blink=max(0.04,abs(elapsed-0.11)/0.11)
-        gx=f.gaze*48+math.sin(t*0.7)*9;gy=math.sin(t*0.9)*5
+        gx=f.gaze*48+math.sin(t*0.7)*9;gy=math.sin(t*0.9)*5+self.console.camera_feed.gaze_y*30
         if name=="SIDE EYE":gx=45
         if name=="SUSPICIOUS":gx=-35
         if name=="DISCO":gx=math.sin(t*7)*38;gy=math.cos(t*7)*24

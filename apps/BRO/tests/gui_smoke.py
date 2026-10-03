@@ -109,6 +109,13 @@ if __name__=="__main__":
     app.draw(3.0);root.update()
     look.variables["panel_border"].set("broken");assert not look.update()
     look.reset();look.window.destroy()
+    feed=app.console.camera_feed
+    feed.mode.set("Face");feed.configure_vision()
+    feed.observation({'target':(0.8,-0.5),'count':1,'ms':10,'error':''})
+    assert feed.target==(0.8,-0.5) and "tracking" in feed.vision_status.get()
+    app.draw(3);feed.mode.set("Off");feed.configure_vision()
+    assert feed.target is None
+    feed.poll()
     app.face.mood=0;app.draw(3.0);root.update()
     try:
         from PIL import ImageGrab
