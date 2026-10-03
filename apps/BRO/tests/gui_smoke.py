@@ -116,6 +116,19 @@ if __name__=="__main__":
     app.draw(3);feed.mode.set("Off");feed.configure_vision()
     assert feed.target is None
     feed.poll()
+    gestures=feed.gestures
+    with patch.object(app,'save_preferences'),patch.object(app.console.gamepad,'dispatch') as dispatch:
+        gestures.signal.set('Victory');gestures.action.set('Next speaker');gestures.assign()
+        assert gestures.bindings['Victory']=='Next speaker'
+        gestures.observation({'gesture':'Victory','confidence':.9})
+        dispatch.assert_not_called()
+        gestures.enabled.set(True)
+        with patch('gestures.time.monotonic',side_effect=[1,1.3,1.7]):
+            for _ in range(3):gestures.observation({'gesture':'Victory','confidence':.9})
+        dispatch.assert_called_once_with('Next speaker')
+        feed.smoothing.set(.25);feed.gaze_range.set(.5);feed.center_delay.set(2);feed.settings_changed()
+        assert 'range 50%' in feed.tracking_values.get()
+
     app.face.mood=0;app.draw(3.0);root.update()
     try:
         from PIL import ImageGrab

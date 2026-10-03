@@ -14,6 +14,9 @@ class CameraDirectionTests(unittest.TestCase):
         panel.process=Mock();panel.process.is_alive.return_value=True
         panel.mode=Mock();panel.mode.get.return_value='Motion'
         panel.follow=Mock();panel.follow.get.return_value=True
+        panel.smoothing=Mock();panel.smoothing.get.return_value=.12
+        panel.gaze_range=Mock();panel.gaze_range.get.return_value=1
+        panel.center_delay=Mock();panel.center_delay.get.return_value=1
         panel.invert_x=Mock()
         panel.target=(0.8,0.4);panel.target_at=time.monotonic()
         panel.gaze_y=0;panel.messages=queue.Queue()

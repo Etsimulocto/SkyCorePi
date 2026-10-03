@@ -14,8 +14,15 @@ class Preferences:
         for key in ('model','camera','gamepad','port','speaker'):
             if isinstance(data.get(key),str) and len(data[key])<256:clean[key]=data[key]
         if data.get('detent') in ('2','4'):clean['detent']=data['detent']
-        for key in ('reverse','camera_invert_x'):
+        for key in ('reverse','camera_invert_x','camera_overlay','camera_follow'):
             if type(data.get(key)) is bool:clean[key]=data[key]
+        if data.get('camera_mode') in ('Off','Face','Motion','Hands'):clean['camera_mode']=data['camera_mode']
+        for key,lo,hi in [('camera_smoothing',.02,.5),('camera_range',.2,1),('camera_center_delay',0,5),('gesture_confidence',.5,.95),('gesture_hold',.3,2)]:
+            v=data.get(key)
+            if type(v) in (int,float) and math.isfinite(v) and lo<=v<=hi:clean[key]=v
+        from gestures import GESTURES
+        from gamepad import ACTIONS
+        if isinstance(data.get('gesture_bindings'),dict):clean['gesture_bindings']={k:v for k,v in data['gesture_bindings'].items() if k in GESTURES and v in ACTIONS}
         if isinstance(data.get('geometry'),str) and re.fullmatch(r'\d{3,4}x\d{3,4}(?:[+-]\d+[+-]\d+)?',data['geometry']):clean['geometry']=data['geometry']
         from appearance import validate
         clean["appearance"]=validate(data.get("appearance",{}))

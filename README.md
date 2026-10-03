@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.7.1
+# SkyCorePi / BRO 0.8.0
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,7 +27,7 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.7.1, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.8.0, board firmware 0.1.0, USB protocol 1.
 
 ## Conversation feedback (0.4.1)
 
@@ -66,3 +66,20 @@ Install this update with `bash install_pi.sh` to include OpenCV face cascade dat
 **Eyes follow target** smoothly controls pupils in both axes. On losing a target, gaze holds briefly then centers. Manual gaze inputs can compete with tracking; disable Eyes follow target to use manual gaze. Some stylized expressions override horizontal pupil position. **Tracking overlay** hides/shows marks. Vision off keeps plain preview. Frame capture remains shared with preview in its existing child process; detection runs about five times a second on reduced frames. Diagnostics show searching/tracking, target count and detection time; only state transitions are logged. Camera stops on hide/session end/app close. No recording, identification, cloud inference, chat image input or motor commands are added. Object/hand/marker modes remain later additions. Real Pi camera tracking needs testing.
 
 Camera direction (0.7.1): **Invert gaze X (left / right)** reverses only camera-driven horizontal eye movement. It starts enabled for a camera facing you. Toggle it while moving left/right to match your setup; the choice saves immediately and loads next launch. The preview and tracking overlay retain the original camera orientation.
+
+## Camera controls and hand signals (0.8.0)
+
+Camera mode, overlay, eye following, inversion, response, movement range, and lost-target center delay now save as you adjust them and restore on launch. Camera visibility remains a deliberate user choice. The preview reports delivered capture FPS, target count, detection time, and searching/tracking/errors. FPS includes capture, processing and preview work, not the webcam's advertised rate.
+
+For hand recognition, close BRO and run:
+
+```bash
+bash apps/BRO/install_vision.sh
+python3 app.py --port /dev/ttyACM0
+```
+
+The optional installer creates a separate MediaPipe 1.0.1 runtime and downloads Google's version-1 gesture model. Face/Motion/plain preview continue without it. Select **Hands** in Camera, then enable **gesture actions**. Choose a signal and action and press **Assign signal → action**; choose **None** to unassign. Bindings, confidence and hold time save immediately. Actions start disabled on every launch. Recognition and landmarks stay on this computer.
+
+Supported static signals: Open_Palm, Closed_Fist, Thumb_Up, Thumb_Down, Victory (peace), Pointing_Up and ILoveYou. A signal must exceed confidence and remain stable for the hold duration. After firing, lower the hand for at least 0.4 seconds before another action; changing signals alone does not re-arm. Stalled frames do not count as a hold/release. No wave or left/right pointing classifier is claimed. Eye following competes with manual gaze actions; disable it when assigning Look left/right.
+
+Source: [Google MediaPipe Gesture Recognizer Python guide](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer/python). Camera remains stoppable and local. This release does not add voice synthesis, Architect enrollment, recording, chat vision or motor control.

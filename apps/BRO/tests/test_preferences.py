@@ -16,3 +16,16 @@ class PreferenceTests(unittest.TestCase):
             path.write_text(json.dumps({'reverse':'false','detent':'99','geometry':'bad'}))
             self.assertNotIn('reverse',Preferences(path).load())
             self.assertNotIn('geometry',Preferences(path).load())
+    def test_camera_and_gesture_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prefs=Preferences(Path(directory)/'settings.json')
+            prefs.save(dict(camera_mode='Hands',camera_overlay=False,camera_follow=True,camera_invert_x=True,camera_smoothing=.2,camera_range=.6,camera_center_delay=2,gesture_hold=.8,gesture_confidence=.75,gesture_bindings={'Victory':'Next speaker','bad':'Fullscreen','Thumb_Up':'bad'},gesture_enabled=True))
+            d=prefs.load()
+            self.assertEqual(d['camera_mode'],'Hands')
+            self.assertEqual(d['camera_smoothing'],.2)
+            self.assertFalse(d['camera_overlay'])
+            self.assertEqual(d['gesture_bindings'],{'Victory':'Next speaker'})
+            self.assertNotIn('gesture_enabled',d)
+            prefs.save(dict(camera_smoothing=float('nan'),camera_range=99,camera_center_delay=-1))
+            self.assertNotIn('camera_smoothing',prefs.load())
+            self.assertNotIn('camera_range',prefs.load())

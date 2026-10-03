@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.7.1"
+VERSION="0.8.0"
 from console import Console
 from preferences import Preferences
 from appearance import Appearance
@@ -144,6 +144,12 @@ class App:
             c.speaker.set(speaker)
         for key,var in [('model',c.chat.model),('camera',c.camera_feed.source),('camera_invert_x',c.camera_feed.invert_x),('gamepad',c.gamepad.device),('port',self.port),('detent',self.detent),('reverse',self.reverse)]:
             if key in data:var.set(data[key])
+        feed=c.camera_feed
+        for key,var in [('camera_mode',feed.mode),('camera_overlay',feed.overlay),('camera_follow',feed.follow),('camera_smoothing',feed.smoothing),('camera_range',feed.gaze_range),('camera_center_delay',feed.center_delay),('gesture_confidence',feed.gestures.threshold),('gesture_hold',feed.gestures.hold)]:
+            if key in data:var.set(data[key])
+        feed.gestures.bindings.update(data.get('gesture_bindings',{}))
+        feed.gestures.action.set(feed.gestures.bindings[feed.gestures.signal.get()])
+        feed.update_values()
         self.settings()
         if 'geometry' in data:self.root.geometry(data['geometry'])
         self.log('Saved settings loaded' if data else 'Default settings')
@@ -152,6 +158,8 @@ class App:
         if self.demo:return
         c=self.console;c.speaker_hues[c.speaker.get()]=self.face.hue
         data=dict(appearance=self.appearance.values,model=c.chat.model.get(),camera=c.camera_feed.source.get(),camera_invert_x=c.camera_feed.invert_x.get(),gamepad=c.gamepad.device.get(),port=self.port.get(),speaker=c.speaker.get(),hues=c.speaker_hues,detent=self.detent.get(),reverse=self.reverse.get(),geometry=self.root.geometry())
+        feed=c.camera_feed
+        data.update(camera_mode=feed.mode.get(),camera_overlay=feed.overlay.get(),camera_follow=feed.follow.get(),camera_smoothing=feed.smoothing.get(),camera_range=feed.gaze_range.get(),camera_center_delay=feed.center_delay.get(),gesture_confidence=feed.gestures.threshold.get(),gesture_hold=feed.gestures.hold.get(),gesture_bindings=feed.gestures.bindings)
         try:self.preferences.save(data);self.log('Settings saved')
         except OSError as exc:self.log('Settings save error: '+str(exc))
 
