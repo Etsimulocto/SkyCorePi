@@ -23,8 +23,14 @@ class Dashboard:
             'USB: '+(('connected '+a.port.get()) if a.ready else ('connecting '+a.port.get()) if a.usb.port else 'disconnected'),
             'Gamepad: '+('connected '+c.gamepad.device_path if c.gamepad.fd is not None else 'disconnected'),
             'Camera: '+c.camera_feed.status.get(),
+            'Vision: '+c.camera_feed.vision_status.get(),
+            'Gestures: '+('enabled' if c.camera_feed.gestures.enabled.get() else 'disabled')+' · '+c.camera_feed.gestures.status.get(),
             'Ollama: '+c.chat.connection_status,
             'Model: '+c.chat.model.get()+' / Speaker: '+c.speaker.get()])
     def poll(self):self.status.set(self.summary())
     def copy(self):
+        import json
+        feed=self.console.camera_feed
+        self.app.log('Camera controls: '+feed.tracking_values.get()+' · inverted='+str(feed.invert_x.get()))
+        self.app.log('Gesture bindings: '+json.dumps(feed.gestures.bindings))
         self.app.log(self.summary());self.app.log(self.console.chat.diagnostic_summary());self.app.copy_log()

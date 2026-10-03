@@ -55,6 +55,7 @@ class Tracker:
             elif mode==3 and self.hands is not None:
                 try:
                     self.gesture,self.confidence,self.points=self.hands.detect(cv.cvtColor(frame,cv.COLOR_BGR2RGB))
+                    self.error=''
                     if self.points:
                         h,w=frame.shape[:2];xs=[p[0]*w for p in self.points];ys=[p[1]*h for p in self.points]
                         self.boxes=[(min(xs),min(ys),max(xs)-min(xs),max(ys)-min(ys))]
