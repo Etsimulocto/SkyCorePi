@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.4.2
+# SkyCorePi / BRO 0.5.0
 
 BRO's robot development console: animated face, USB rotary controls, local Ollama chat, camera preview, speech and activity logs, and session controls. Sky, Cold, Monday and GRIT load their original identity cards from `characters/` without modifying them. Each speaker has a separate in-memory conversation history; BRO has his own new robot identity.
 
@@ -27,7 +27,7 @@ Manual text tests remain explicitly labeled. Camera preview, USB reconnect, mous
 
 SkyCam, BloomDoctor, BloomRestore, HarnessMap, BloomFrame and project archives remain available under their original paths. SkyCam and BRO presently require exclusive camera ownership. Original `characters/` and `source/spiralside/` identity archives remain intact.
 
-Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.4.2, board firmware 0.1.0, USB protocol 1.
+Tests: `python3 -m unittest discover -s apps/BRO/tests -v`; UI: `xvfb-run -a python3 apps/BRO/tests/gui_smoke.py`. Real local inference still needs verification on the Pi. App 0.5.0, board firmware 0.1.0, USB protocol 1.
 
 ## Conversation feedback (0.4.1)
 
@@ -36,3 +36,11 @@ The face shows IDLE, THINKING, REPLYING or ERROR. Thinking has bouncing mouth do
 ## Speaker face colors (0.4.2)
 
 Selecting a speaker changes the face accent: BRO mint/teal, Sky blue, Cold ice cyan, Monday pink, GRIT amber. COLOR knob adjustments are remembered per speaker for the current app run. Names and source identity cards remain unchanged.
+
+## Gamepad (0.5.0)
+
+Pi/Linux controllers exposed as `/dev/input/js*` autodetect and reconnect. Default typical Xbox mapping: left stick horizontal looks left/right, button0 next control, button1 weird burst, button4/5 previous/next speaker. Numbering varies: use **Learn next button / direction** to assign any observed button or axis direction to a named action. Select an action, learn, then press a button or move a centered stick. Learning consumes the input without triggering its action, times out after 15 seconds, and can be cancelled. Assign **None** to unbind an input. Show bindings copies them into the normal log. Restore defaults resets saved assignments.
+
+Bindings save locally to `~/.config/skycorepi/gamepad.json` across restarts. A single mapping is used for the selected controller; select a device when several are attached. Dead zone and direction latching avoid repeated actions while held. Return a stick to center before another step. Gaze stays where assigned; map Center gaze to a button if desired. Session end closes gamepad input. No rumble or motors are driven. Windows gamepad support remains future work.
+
+If USB appears in lsusb but no joystick node appears, run `ls /dev/input/js*` and check the joydev driver/desktop input permissions; do not run BRO as root. Real Xbox button numbering still needs bench validation.

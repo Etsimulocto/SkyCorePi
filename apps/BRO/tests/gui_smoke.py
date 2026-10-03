@@ -78,6 +78,16 @@ if __name__=="__main__":
     chat.events.put((chat.epoch,"reply",None,"connection refused"));chat.poll()
     assert chat.phase=="ERROR" and not chat.busy
     assert "connection refused" in chat.diagnostic_summary()
+    pad=app.console.gamepad
+    with patch.object(pad,"save"),patch.object(pad,"dispatch") as dispatch:
+        pad.action.set("Weird burst");pad.learn();pad.handle("button12")
+        assert pad.bindings["button12"]=="Weird burst"
+        dispatch.assert_not_called()
+        pad.handle("button12");dispatch.assert_called_once_with("Weird burst")
+    app.console.speaker.set("BRO");pad.dispatch("Next speaker")
+    assert app.console.speaker.get()=="Sky"
+    pad.dispatch("Look left");assert app.face.gaze==-1
+    pad.dispatch("Center gaze");assert app.face.gaze==0
     app.console.camera_visible.set(False);app.console.toggle_camera()
     app.console.speaker.set("BRO")
     app.face.mood=0;app.draw(3.0);root.update()

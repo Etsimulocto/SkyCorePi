@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 from camera import CameraPanel
 from chat import ChatPanel
+from gamepad import Gamepad
 
 SPEAKERS=("BRO","Sky","Cold","Monday","GRIT")
 SPEAKER_HUES={"BRO":0.46,"Sky":0.60,"Cold":0.51,"Monday":0.90,"GRIT":0.08}
@@ -49,7 +50,7 @@ class Console:
         ttk.Button(heading,text="Copy speech",command=self.copy_speech).pack(side="right")
         self.speech=self.text_box(self.speech_frame,4)
         ttk.Label(self.dev,text="BRO / DEVELOPMENT",font=("Sans",12,"bold")).pack(anchor="w")
-        ttk.Label(self.dev,text="Keyboard + mouse: ready\nRotary: USB connection above\nJoystick: not connected",justify="left").pack(anchor="w",pady=8)
+        ttk.Label(self.dev,text="Keyboard + mouse: ready\nRotary: USB connection above\nGamepad: see assigner below",justify="left").pack(anchor="w",pady=8)
         ttk.Label(self.dev,text="Text output test (manual)",font=("Sans",10,"bold")).pack(anchor="w")
         self.draft=tk.Text(self.dev,height=3,width=28,wrap="word",bg="#13243a",fg="#d7fff6",insertbackground="white")
         self.draft.pack(fill="x",pady=5)
@@ -63,6 +64,7 @@ class Console:
         self.camera=self.camera_feed.frame
         self.show_output("BRO","Face online. Ready to build.",source="sample")
         self.chat=ChatPanel(self)
+        self.gamepad=Gamepad(self)
 
     def change_speaker_color(self,*_):
         speaker=self.speaker.get()
@@ -132,6 +134,7 @@ class Console:
 
     def toggle_session(self):
         if self.active:
+            self.gamepad.close()
             self.chat.invalidate()
             self.camera_feed.stop()
             self.app.disconnect()
