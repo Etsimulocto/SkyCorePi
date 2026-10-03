@@ -1,13 +1,4 @@
-#!/bin/bash
-cd /home/quarterbitgames/SkyCorePi
-
-python3 app.py &
-sleep 4
-
-xdg-open http://localhost:5000#!/bin/bash
-cd /home/quarterbitgames/SkyCorePi
-
-python3 app.py &
-sleep 4
-
-xdg-open http://localhost:5000
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+exec python3 app.py "$@"
