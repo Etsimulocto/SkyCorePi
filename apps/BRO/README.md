@@ -1,4 +1,4 @@
-# BRO 0.8.1 — interface and bench guide
+# BRO 0.9.0 — interface and bench guide
 
 BRO's native Tk desktop app is the active robot interface in SkyCorePi. See the [repository README](../../README.md) for installation, bench results, the Sign Bank plan, and existing tools.
 
@@ -46,7 +46,7 @@ Keyboard/mouse and rotary controls remain usable alongside the gamepad. Typing i
 
 Select the speaker and model, enter a message in **Local conversation**, and send. Replies retain the speaker selected at send time even if you switch afterward. Each speaker has a separate bounded, in-memory history. **Clear selected speaker chat** clears only that speaker and cancels a pending reply for that speaker.
 
-The face shows **IDLE**, **THINKING**, **REPLYING**, or **ERROR**. Reply mouth animation is visual feedback, not audio. Manual/sample text is labeled distinctly. Text output and activity logs are copyable; request diagnostics include the endpoint, speaker/model, elapsed time, and errors.
+The face shows **IDLE**, **THINKING**, **REPLYING**, or **ERROR**. Reply mouth animation is visual feedback. Optional Piper speech can read AI replies separately. Manual/sample text is labeled distinctly. Text output and activity logs are copyable; request diagnostics include the endpoint, speaker/model, elapsed time, and errors.
 
 Use **Start local AI** / **Stop local AI** in the device panel. The latter stops the service when permitted; fallback model unloading is explicitly reported. Closing the app requests shutdown and writes the result to `~/.cache/skycorepi/ai-shutdown.txt`. Ending a session cancels interaction and releases devices; it is separate from stopping Ollama or closing the app.
 
@@ -111,4 +111,39 @@ Model-load warnings did not prevent the tested Pi installer from reporting ready
 
 ## Future work
 
-See the root [Sign Bank plan](../../README.md#sign-bank-plan--not-implemented). Reference videos/dictionaries, recognition models, and action assignments are distinct pieces. ASL-LEX and ASL Citizen are research/reference candidates, not installed features. Moving signs and signed sentences need sequence-aware models and testing. Architect enrollment, color-marker tracking for glasses, voice output, and the shared board diagnostic core are also unimplemented.
+See the root [Sign Bank plan](../../README.md#sign-bank-plan--not-implemented). Reference videos/dictionaries, recognition models, and action assignments are distinct pieces. ASL-LEX and ASL Citizen are research/reference candidates, not installed features. Moving signs and signed sentences need sequence-aware models and testing. Architect enrollment, color-marker tracking for glasses, and the shared board diagnostic core are also unimplemented.
+
+## Voice and camera microphone (0.9.0)
+
+Run `bash apps/BRO/install_audio.sh` from the repository root, then restart. Audio has its own `~/.local/share/skycorepi/audio-venv`; models are in `~/.cache/skycorepi/audio/`. It is independent of the optional vision environment.
+
+In **Voice / microphone · local**:
+
+1. Detect/rescan audio. Input and output selectors list devices with names, directions and indices in copyable diagnostics. Idle rescan runs every ten seconds.
+2. Leave microphone on Auto to prefer a USB/camera input, or explicitly choose the Arducam/USB microphone if listed. Video nodes and audio devices are separate. If the camera mic is not exposed by Linux, the app cannot invent it.
+3. Leave output on Auto for the system default, or choose the HDMI/monitor audio device feeding the headphones. Use Test selected voice before enabling automatic replies.
+4. Choose a voice for the selected character; adjust volume/speed, mute, or stop speech. **Read latest reply** reads displayed text. **Speak AI replies automatically** applies only to local AI replies, not manual samples or your input.
+5. **Start listening** opens the microphone for at most twenty seconds. Speak and watch the input meter, then click **Finish listening → chat draft**. Review the draft before Send. The stop/cancel button discards the current recording/transcript instead.
+
+Listening interrupts current speech; speech does not interrupt an active listening operation. A newer speech request replaces older speech. Session end/app close cancels audio workers. Audio errors and selected device details are available through **Copy audio diagnostics** and the broader device report.
+
+One voice, `en_US-lessac-medium`, is installed initially. All characters initially use that same sound, with independent saved assignments. To add another published Piper voice, choose its identifier from the [voice samples](https://rhasspy.github.io/piper-samples/), then run:
+
+```bash
+~/.local/share/skycorepi/audio-venv/bin/python -m piper.download_voices --data-dir ~/.cache/skycorepi/audio/voices VOICE_ID
+```
+
+Replace VOICE_ID with an actual listed identifier, rescan audio, and select it for the character. This changes audio output settings, not identity cards.
+
+| Audio symptom | Check |
+| --- | --- |
+| Audio runtime/model missing | Run the audio installer and wait for its ready message. |
+| Camera preview works but mic is absent | Copy audio diagnostics; verify Linux exposes the camera's microphone as a capture device. |
+| Input meter stays flat | Select the actual USB input, check system mic mute/gain, and test while speaking. |
+| Device unavailable after reconnect | Rescan. Saved names tolerate changed indices; duplicate names require selecting the correct current entry. |
+| No sound | Check mute/volume, monitor headphones, system output and the output selector; Test selected voice. |
+| Device busy / PortAudio error | Close competing audio capture apps or choose a usable device; copy the exact error. |
+| Transcription is wrong | Review/edit the draft; microphone placement and the small English model limit recognition. Nothing is sent automatically. |
+| Ollama is stopped | Audio tests/transcription still work. Start local AI only when you want a chat response. |
+
+Live audio routing and the camera mic remain to be confirmed on the Architect's Pi. Models are tested separately in CI with synthesized audio and a published Vosk speech fixture; CI does not establish physical microphone/headphone behavior.

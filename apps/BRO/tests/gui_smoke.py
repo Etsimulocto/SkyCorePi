@@ -130,6 +130,23 @@ if __name__=="__main__":
         feed.smoothing.set(.25);feed.gaze_range.set(.5);feed.center_delay.set(2);feed.settings_changed()
         assert 'range 50%' in feed.tracking_values.get()
 
+    audio=app.console.audio
+    from unittest.mock import patch
+    with patch.object(audio.engine,'run') as run,patch.object(audio.engine,'cancel'):
+        audio.input.set('Auto');audio.listen()
+        assert run.call_args.args[0]['operation']=='listen'
+        audio.console.chat.entry.delete('1.0','end');audio.console.chat.entry.insert('end','Existing draft')
+        audio.engine.events.put((audio.engine.epoch,{'kind':'transcript','text':'hello architect'}))
+        audio.engine.events.put((audio.engine.epoch,{'kind':'exit'}));audio.poll()
+        assert 'Existing draft' in chat.entry.get('1.0','end') and 'hello architect' in chat.entry.get('1.0','end')
+        audio.copy();assert 'Input=Auto' in root.clipboard_get()
+        audio.voices['Sky']='en_US-lessac-medium';audio.auto.set(True)
+        with patch.object(audio,'speak') as speak:
+            app.console.speaker.set('Monday');app.console.show_output('Sky','Test reply',source='local AI')
+            speak.assert_called_once_with('Sky','Test reply')
+        audio.muted.set(True)
+        audio.speak('BRO','muted');assert run.call_count==1
+        audio.stop();assert audio.busy is None
     app.face.mood=0;app.draw(3.0);root.update()
     try:
         from PIL import ImageGrab

@@ -1,4 +1,4 @@
-# SkyCorePi / BRO 0.8.1
+# SkyCorePi / BRO 0.9.0
 
 BRO is our robot interface development console on Raspberry Pi: an animated face, physical controls, local AI conversation, live camera preview, tracking, hand signals, and copyable diagnostics. We are working out the interface before building the robot body.
 
@@ -26,7 +26,7 @@ python3 app.py --port /dev/ttyACM0
 
 The vision installer creates a separate runtime, installs MediaPipe 1.0.1, downloads Google's version-1 gesture model, checks its SHA256, and verifies it loads. Face/Motion/plain preview work without this optional runtime. Existing vision installations do not need reinstalling for 0.8.1.
 
-App **0.8.1**, encoder firmware **BloomFace 0.1.0**, USB protocol **1**. No board reflash is needed for these desktop updates.
+App **0.9.0**, encoder firmware **BloomFace 0.1.0**, USB protocol **1**. No board reflash is needed for these desktop updates.
 
 ## Current capabilities
 
@@ -40,6 +40,7 @@ App **0.8.1**, encoder firmware **BloomFace 0.1.0**, USB protocol **1**. No boar
 | Vision | Off, Face, Motion, Hands; overlay, eye following, horizontal inversion |
 | Tracking controls | Saved smoothing/response, gaze range, lost-target centering delay |
 | Hand signals | Seven static poses, saved action assignments, confidence/hold controls, release protection |
+| Audio | Local Piper speech, per-character voice selection, volume/speed/mute, Vosk microphone transcription into a draft |
 | Appearance | Live Look Editor for panel borders, panels, buttons, fields, face details, fonts |
 | Diagnostics | Device dashboard, activity/chat logs, Copy device diagnostics, Copy camera / vision status |
 
@@ -65,7 +66,7 @@ The basic frontal-face detector did not reliably find the Architect wearing glas
 
 Ollama runs at `http://127.0.0.1:11434`. The tested Pi has `qwen2.5:0.5b` and `llama3.2:3b`; the default is the smaller model. Use **Start local AI** when it is stopped. **Stop local AI** discards pending replies and attempts to stop `ollama.service`. Closing BRO also attempts shutdown; if it can only unload models, it reports that the service remains running. The installer grants narrowly limited service start/stop permissions. Ollama's boot-time enablement is unchanged.
 
-Ending a session releases the camera/USB/gamepad and rejects pending replies. Existing conversation histories remain until the app closes or a selected speaker's history is cleared. Camera frames are processed locally and are not sent to the text model. There is no recording or voice synthesis in this release.
+Ending a session releases the camera/USB/gamepad and rejects pending replies. Existing conversation histories remain until the app closes or a selected speaker's history is cleared. Camera frames are processed locally and are not sent to the text model. There is no camera recording. Optional voice synthesis and explicit microphone capture are described below.
 
 Settings live in `~/.config/skycorepi/settings.json`; gamepad bindings live separately in `~/.config/skycorepi/gamepad.json`. Camera controls and gesture assignments save immediately. Other preferences save with **Save settings** or normal closing. Gesture actions start disabled on every launch. Conversation text is not saved by this settings feature. Demo mode skips saved preferences and never stops Ollama.
 
@@ -82,7 +83,7 @@ Resources investigated:
 - [ASL Citizen code and research checkpoints](https://github.com/microsoft/ASL-citizen-code): candidates to investigate; not yet integrated or benchmarked on this Pi.
 - [MediaPipe Gesture Recognizer](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer/python): the current static hand-pose foundation.
 
-Start with a small chosen vocabulary and measure it on the actual camera. Keep reference-only entries distinct from supported recognition. Custom moving signs, full signed sentences, voice output, and Architect recognition are future work. Bright removable markers on glasses could be a separate color-tracking experiment; no marker tracker exists yet.
+Start with a small chosen vocabulary and measure it on the actual camera. Keep reference-only entries distinct from supported recognition. Custom moving signs, full signed sentences, Architect recognition and full sign-language translation are future work. Bright removable markers on glasses could be a separate color-tracking experiment; no marker tracker exists yet.
 
 ## Shared diagnostics direction
 
@@ -102,4 +103,25 @@ xvfb-run -a python3 apps/BRO/tests/gui_smoke.py
 python3 -m py_compile app.py apps/BRO/*.py
 ```
 
-GitHub Actions additionally installs the optional vision runtime and runs real-model blank-frame/thumbs-up tests plus a system-Python-parent / vision-venv-child regression test. The 0.8.1 checks passed; 33 tests are discovered, with environment-specific integrations skipped outside their configured run. Tests do not establish recognition accuracy across people, lighting, or camera positions.
+GitHub Actions additionally installs the optional vision runtime and runs real-model blank-frame/thumbs-up tests plus a system-Python-parent / vision-venv-child regression test. The 0.8.1 checks passed before the audio addition; the 0.9.0 suite discovers 41 tests, with environment-specific integrations skipped outside their configured run. Tests do not establish recognition accuracy across people, lighting, or camera positions.
+
+## Local voice and microphone (0.9.0)
+
+Close BRO, update, then install the optional audio runtime once:
+
+```bash
+cd ~/SkyCorePi
+git pull
+bash apps/BRO/install_audio.sh
+python3 app.py --port /dev/ttyACM0
+```
+
+The installer uses a separate audio venv with Piper 1.8.0, Vosk 0.3.45, sounddevice 0.5.6 and PortAudio. It downloads one Lessac medium voice (about 63MB) and the small US-English Vosk model (about 40MB download), then checks both load. Dependencies and the extracted recognition model add disk space.
+
+The Voice / microphone panel detects audio inputs and outputs at startup and rescans while idle every ten seconds. **Auto microphone** prefers exposed USB/camera inputs; **Auto output** uses the system default, useful for the Architect's monitor headphone jack. Explicit device selectors, input level, Test selected voice, Read latest reply, volume, speed, mute and Stop/cancel are available. Names are preserved when device indices change. Hardware must actually expose a Linux audio capture device; camera video detection alone does not establish microphone availability.
+
+**Start listening** records only after explicit activation, for at most twenty seconds. **Finish listening → chat draft** stops capture and puts recognized text into the chat draft, preserving existing draft text. Review it, then click Send. Cancel/session end/app close releases capture and rejects stale results. No always-on listening, wake word, automatic transcript sending, or persistent microphone recording is added. Speech and transcription run locally in bounded, cancellable subprocesses; they do not require Ollama.
+
+Automatic reading of AI replies is optional and off by default. Voice choices are per character and preserve reply attribution even when the selected speaker changes. One voice is installed initially, so characters initially share its sound; additional downloaded Piper voices can be selected. These audio preferences save with the normal settings. Copy audio diagnostics reports selections, device names and errors. Audio hardware, headphone playback, and microphone recognition still need live bench verification on the Pi.
+
+Audio sets ONNX Runtime’s documented ORT_DISABLE_TELEMETRY=1 opt-out before initialization, in workers, installation and tests. No telemetry permission is needed for BRO speech. [Runtime privacy controls](https://github.com/microsoft/onnxruntime/blob/main/docs/Privacy.md).

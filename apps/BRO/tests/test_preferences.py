@@ -29,3 +29,13 @@ class PreferenceTests(unittest.TestCase):
             prefs.save(dict(camera_smoothing=float('nan'),camera_range=99,camera_center_delay=-1))
             self.assertNotIn('camera_smoothing',prefs.load())
             self.assertNotIn('camera_range',prefs.load())
+
+    def test_audio_preferences(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p=Preferences(Path(directory)/'settings.json')
+            p.save(dict(audio_input='4: USB Camera',audio_output='Auto',audio_volume=.4,audio_speed=1.2,audio_auto=True,audio_muted=False,audio_voices={'Sky':'en_US-lessac-medium','BRO':'../bad','unknown':'test'}))
+            d=p.load()
+            self.assertEqual(d['audio_input'],'4: USB Camera')
+            self.assertEqual(d['audio_volume'],.4)
+            self.assertEqual(d['audio_voices'],{'Sky':'en_US-lessac-medium'})
+            self.assertTrue(d['audio_auto'])

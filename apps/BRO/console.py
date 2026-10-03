@@ -5,6 +5,7 @@ from camera import CameraPanel
 from chat import ChatPanel
 from gamepad import Gamepad
 from dashboard import Dashboard
+from audio import AudioPanel
 
 SPEAKERS=("BRO","Sky","Cold","Monday","GRIT")
 SPEAKER_HUES={"BRO":0.46,"Sky":0.60,"Cold":0.51,"Monday":0.90,"GRIT":0.08}
@@ -66,6 +67,7 @@ class Console:
         self.show_output("BRO","Face online. Ready to build.",source="sample")
         self.chat=ChatPanel(self)
         self.gamepad=Gamepad(self)
+        self.audio=AudioPanel(self)
         self.dashboard=Dashboard(self)
 
     def change_speaker_color(self,*_):
@@ -101,6 +103,7 @@ class Console:
         self.messages=self.messages[-50:]
         self.set_text(self.speech,"\n\n".join(self.messages))
         if hasattr(self.app,"console"):self.app.log("Text displayed: "+speaker+" / "+source)
+        if source=='local AI' and hasattr(self,'audio') and self.audio.auto.get():self.audio.speak(speaker,text)
         return True
 
     def publish_draft(self):
@@ -136,6 +139,7 @@ class Console:
 
     def toggle_session(self):
         if self.active:
+            self.audio.stop()
             self.gamepad.close()
             self.chat.invalidate()
             self.camera_feed.stop()

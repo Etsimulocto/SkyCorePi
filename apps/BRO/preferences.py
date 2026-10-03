@@ -11,15 +11,16 @@ class Preferences:
         except (OSError,ValueError):return {}
         if not isinstance(data,dict):return {}
         clean={}
-        for key in ('model','camera','gamepad','port','speaker'):
+        for key in ('model','camera','gamepad','port','speaker','audio_input','audio_output'):
             if isinstance(data.get(key),str) and len(data[key])<256:clean[key]=data[key]
         if data.get('detent') in ('2','4'):clean['detent']=data['detent']
-        for key in ('reverse','camera_invert_x','camera_overlay','camera_follow'):
+        for key in ('reverse','camera_invert_x','camera_overlay','camera_follow','audio_muted','audio_auto'):
             if type(data.get(key)) is bool:clean[key]=data[key]
         if data.get('camera_mode') in ('Off','Face','Motion','Hands'):clean['camera_mode']=data['camera_mode']
-        for key,lo,hi in [('camera_smoothing',.02,.5),('camera_range',.2,1),('camera_center_delay',0,5),('gesture_confidence',.5,.95),('gesture_hold',.3,2)]:
+        for key,lo,hi in [('camera_smoothing',.02,.5),('camera_range',.2,1),('camera_center_delay',0,5),('gesture_confidence',.5,.95),('gesture_hold',.3,2),('audio_volume',0,1),('audio_speed',.6,1.6)]:
             v=data.get(key)
             if type(v) in (int,float) and math.isfinite(v) and lo<=v<=hi:clean[key]=v
+        if isinstance(data.get('audio_voices'),dict):clean['audio_voices']={k:v for k,v in data['audio_voices'].items() if k in ('BRO','Sky','Cold','Monday','GRIT') and isinstance(v,str) and re.fullmatch(r'[A-Za-z0-9_-]{1,100}',v)}
         from gestures import GESTURES
         from gamepad import ACTIONS
         if isinstance(data.get('gesture_bindings'),dict):clean['gesture_bindings']={k:v for k,v in data['gesture_bindings'].items() if k in GESTURES and v in ACTIONS}

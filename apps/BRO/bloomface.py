@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from model import FaceState, MOODS, CONTROLS
 
-VERSION="0.8.1"
+VERSION="0.9.0"
 from console import Console
 from preferences import Preferences
 from appearance import Appearance
@@ -150,6 +150,11 @@ class App:
         feed.gestures.bindings.update(data.get('gesture_bindings',{}))
         feed.gestures.action.set(feed.gestures.bindings[feed.gestures.signal.get()])
         feed.update_values()
+        audio=c.audio
+        for key,var in [('audio_input',audio.input),('audio_output',audio.output),('audio_volume',audio.volume),('audio_speed',audio.speed),('audio_muted',audio.muted),('audio_auto',audio.auto)]:
+            if key in data:var.set(data[key])
+        audio.voices.update(data.get('audio_voices',{}))
+        audio.voice.set(audio.voices[c.speaker.get()])
         self.settings()
         if 'geometry' in data:self.root.geometry(data['geometry'])
         self.log('Saved settings loaded' if data else 'Default settings')
@@ -160,6 +165,8 @@ class App:
         data=dict(appearance=self.appearance.values,model=c.chat.model.get(),camera=c.camera_feed.source.get(),camera_invert_x=c.camera_feed.invert_x.get(),gamepad=c.gamepad.device.get(),port=self.port.get(),speaker=c.speaker.get(),hues=c.speaker_hues,detent=self.detent.get(),reverse=self.reverse.get(),geometry=self.root.geometry())
         feed=c.camera_feed
         data.update(camera_mode=feed.mode.get(),camera_overlay=feed.overlay.get(),camera_follow=feed.follow.get(),camera_smoothing=feed.smoothing.get(),camera_range=feed.gaze_range.get(),camera_center_delay=feed.center_delay.get(),gesture_confidence=feed.gestures.threshold.get(),gesture_hold=feed.gestures.hold.get(),gesture_bindings=feed.gestures.bindings)
+        audio=c.audio
+        data.update(audio_input=audio.input.get(),audio_output=audio.output.get(),audio_volume=audio.volume.get(),audio_speed=audio.speed.get(),audio_muted=audio.muted.get(),audio_auto=audio.auto.get(),audio_voices=audio.voices)
         try:self.preferences.save(data);self.log('Settings saved')
         except OSError as exc:self.log('Settings save error: '+str(exc))
 
@@ -352,6 +359,7 @@ class App:
         now=time.monotonic();t=now-self.started;self.poll(now)
         self.console.camera_feed.poll()
         self.console.chat.poll()
+        self.console.audio.poll()
         self.console.gamepad.poll()
         self.console.dashboard.poll()
         if t>self.next_blink:
@@ -363,7 +371,7 @@ class App:
 
     def close(self):
         self.save_preferences();self.console.chat.invalidate()
-        self.console.gamepad.close();self.console.camera_feed.stop();self.usb.close()
+        self.console.audio.stop();self.console.gamepad.close();self.console.camera_feed.stop();self.usb.close()
         if not self.demo:
             from ai_power import shutdown_report
             threading.Thread(target=shutdown_report,daemon=False).start()
