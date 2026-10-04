@@ -7,11 +7,19 @@ if [[ "${1:-}" == '--compile-only' ]]; then
   arduino-cli compile --fqbn "$FQBN" "$HERE/firmware/BloomFace"
   exit
 fi
-[[ $# == 1 ]] || { echo 'Usage: bash BloomFace/flash.sh /dev/ttyACM0'; exit 1; }
+[[ $# == 1 ]] || { echo 'Usage: bash apps/BRO/flash.sh /dev/ttyACM0'; exit 1; }
 echo "Replacing the bench board firmware with BloomFace on $1."
 echo 'Close all serial apps first; disconnect all measurement leads and external supplies.'
-# Pause known desktop watchers to keep the flashing port free. Login restores them.
+restart_watcher(){
+  if [[ -f "$HERE/plug_watch.py" ]]; then
+    mkdir -p "$HOME/.cache/bloomface"
+    ( sleep 1; nohup python3 "$HERE/plug_watch.py" >> "$HOME/.cache/bloomface/watcher.log" 2>&1 < /dev/null & ) >/dev/null 2>&1 || true
+  fi
+}
+trap restart_watcher EXIT
+# Pause known desktop watchers to keep the flashing port free.
 pkill -f '[p]ython3 .*BloomScope/plug_watch.py' 2>/dev/null || true
 pkill -f '[p]ython3 .*BloomFace/plug_watch.py' 2>/dev/null || true
+pkill -f '[p]ython3 .*BRO/plug_watch.py' 2>/dev/null || true
 arduino-cli compile --fqbn "$FQBN" "$HERE/firmware/BloomFace"
 arduino-cli upload --fqbn "$FQBN" --port "$1" "$HERE/firmware/BloomFace"
