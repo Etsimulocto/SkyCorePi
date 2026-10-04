@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sudo apt-get install -y python3-tk python3-serial python3-opencv
+sudo apt-get install -y python3-tk python3-serial python3-opencv wmctrl
 if [[ -f "$HOME/.config/autostart/bloomface-plug-watch.desktop" ]]; then
   mv "$HOME/.config/autostart/bloomface-plug-watch.desktop" "$HOME/.config/autostart/bloomface-plug-watch.desktop.disabled"
 fi
