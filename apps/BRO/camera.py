@@ -1,4 +1,10 @@
-"""Local webcam preview; capture lives in a stoppable child process."""
+"""Local webcam preview; capture lives in a stoppable child process.
+
+BloomCore boundary:
+- Vision/tracking always receives the unfiltered camera frame.
+- Video effects are applied only to the human-facing preview after tracking.
+- Effects are local-only and do not record or transmit camera frames.
+"""
 import glob
 import multiprocessing as mp
 import os
@@ -9,6 +15,8 @@ import tkinter as tk
 from tkinter import ttk
 import time
 
+VIDEO_EFFECTS=('Raw','Soft','Cartoon','Ink','Silhouette','Pixel')
+
 
 def candidates():
     if os.name=='posix':
@@ -16,7 +24,53 @@ def candidates():
     return list(range(4))
 
 
-def capture_worker(messages,stop,source,vision_mode=None,vision_overlay=None):
+def apply_video_effect(cv2,frame,effect='Raw',strength=.65):
+    """Return a display-only BGR frame. Never feed this result back to vision."""
+    strength=max(0.0,min(1.0,float(strength)))
+    if effect=='Raw' or strength<=.01:
+        return frame
+    if effect=='Soft':
+        # Edge-preserving smoothing hides skin/background detail without becoming mushy.
+        diameter=5+int(strength*8)
+        if diameter%2==0:diameter+=1
+        return cv2.bilateralFilter(frame,diameter,35+int(strength*55),35+int(strength*55))
+    if effect=='Cartoon':
+        # Small palette + dark edges. Kept intentionally cheap for Raspberry Pi preview.
+        smooth=cv2.bilateralFilter(frame,7,45+int(strength*45),45+int(strength*45))
+        levels=max(3,8-int(strength*4))
+        step=max(1,256//levels)
+        poster=(smooth//step)*step
+        gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        gray=cv2.medianBlur(gray,5)
+        block=7 if strength<.6 else 9
+        edges=cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,block,5)
+        edges=cv2.cvtColor(edges,cv2.COLOR_GRAY2BGR)
+        return cv2.bitwise_and(poster,edges)
+    if effect=='Ink':
+        gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        gray=cv2.GaussianBlur(gray,(5,5),0)
+        low=35+int((1-strength)*45);high=100+int((1-strength)*90)
+        edges=cv2.Canny(gray,low,high)
+        ink=255-edges
+        return cv2.cvtColor(ink,cv2.COLOR_GRAY2BGR)
+    if effect=='Silhouette':
+        # Privacy-first high-contrast shadow image; intentionally removes face/color detail.
+        gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        gray=cv2.GaussianBlur(gray,(7,7),0)
+        _,mask=cv2.threshold(gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        if strength<.5:
+            mask=cv2.addWeighted(gray,1-strength*2,mask,strength*2,0)
+        return cv2.cvtColor(mask,cv2.COLOR_GRAY2BGR)
+    if effect=='Pixel':
+        h,w=frame.shape[:2]
+        divisor=8+int(strength*36)
+        sw=max(8,w//divisor);sh=max(6,h//divisor)
+        tiny=cv2.resize(frame,(sw,sh),interpolation=cv2.INTER_LINEAR)
+        return cv2.resize(tiny,(w,h),interpolation=cv2.INTER_NEAREST)
+    return frame
+
+
+def capture_worker(messages,stop,source,vision_mode=None,vision_overlay=None,effect_mode=None,effect_strength=None):
     cap=None;tracker=None
     def send(kind,value):
         try:messages.put_nowait((kind,value))
@@ -40,15 +94,22 @@ def capture_worker(messages,stop,source,vision_mode=None,vision_overlay=None):
         from vision import Tracker
         tracker=Tracker(cv2);last_frame=time.monotonic();fps=0
         while not stop.is_set():
+            display_frame=frame
             if vision_mode is not None:
                 h,w=frame.shape[:2];scale=min(320/w,240/h)
                 small=cv2.resize(frame,(max(1,int(w*scale)),max(1,int(h*scale))))
                 observation=tracker.process(small,vision_mode.value,bool(vision_overlay.value))
                 if observation is not None:
                     observation['fps']=round(fps,1);send('tracking',observation)
-                frame=small
+                display_frame=small
             now=time.monotonic();fps=.8*fps+.2/max(.001,now-last_frame);last_frame=now
-            rgb=cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+            effect='Raw'
+            if effect_mode is not None:
+                index=max(0,min(len(VIDEO_EFFECTS)-1,int(effect_mode.value)))
+                effect=VIDEO_EFFECTS[index]
+            strength=float(effect_strength.value) if effect_strength is not None else .65
+            display_frame=apply_video_effect(cv2,display_frame,effect,strength)
+            rgb=cv2.cvtColor(display_frame,cv2.COLOR_BGR2RGB)
             h,w=rgb.shape[:2];scale=min(320/w,180/h)
             rgb=cv2.resize(rgb,(max(1,int(w*scale)),max(1,int(h*scale))))
             h,w=rgb.shape[:2]
@@ -83,6 +144,8 @@ class CameraPanel:
         self.invert_x=tk.BooleanVar(value=True)
         self.follow=tk.BooleanVar(value=True);self.target=None;self.target_at=0;self.gaze_y=0;self.last_tracking=None
         self.vision_mode=None;self.vision_overlay=None
+        self.effect_mode=None;self.effect_strength_value=None
+        self.effect=tk.StringVar(value='Raw');self.effect_strength=tk.DoubleVar(value=.65)
         self.smoothing=tk.DoubleVar(value=.12);self.gaze_range=tk.DoubleVar(value=1.0);self.center_delay=tk.DoubleVar(value=1.0)
         self.vision_status=tk.StringVar(value='Vision off')
         mode=ttk.Combobox(self.frame,textvariable=self.mode,values=('Off','Face','Motion','Hands'),state='readonly',width=14);mode.pack(fill='x')
@@ -98,12 +161,34 @@ class CameraPanel:
         ttk.Label(self.frame,textvariable=self.tracking_values,wraplength=290).pack(fill='x')
         self.update_values()
         self.gestures=GesturePanel(self)
+
+        effects=ttk.LabelFrame(self.frame,text='Video effect · preview only',padding=5);effects.pack(fill='x',pady=(6,2))
+        ttk.Label(effects,text='Tracking still uses the raw camera frame.',wraplength=275).pack(fill='x')
+        quick=ttk.Frame(effects);quick.pack(fill='x')
+        for i,name in enumerate(VIDEO_EFFECTS):
+            ttk.Button(quick,text=name,width=9,command=lambda n=name:self.set_effect(n)).grid(row=i//3,column=i%3,sticky='ew',padx=1,pady=1)
+            quick.columnconfigure(i%3,weight=1)
+        ttk.Label(effects,text='Effect strength').pack(anchor='w')
+        ttk.Scale(effects,variable=self.effect_strength,from_=0,to=1,command=self.effect_changed).pack(fill='x')
+        self.effect_status=tk.StringVar(value='Effect: Raw')
+        ttk.Label(effects,textvariable=self.effect_status).pack(anchor='w')
+
         self.image=ttk.Label(self.frame,anchor='center');self.image.pack(fill='x')
 
     def copy_status(self):
-        text=self.status.get()+'\n'+self.vision_status.get()+'\n'+self.gestures.status.get()
+        text=self.status.get()+'\n'+self.vision_status.get()+'\n'+self.effect_status.get()+' · preview-only\n'+self.gestures.status.get()
         self.app.root.clipboard_clear();self.app.root.clipboard_append(text)
         self.app.log('Camera / vision status copied')
+
+    def set_effect(self,name):
+        if name not in VIDEO_EFFECTS:return
+        self.effect.set(name);self.effect_changed()
+
+    def effect_changed(self,*_):
+        if self.effect_mode is not None:self.effect_mode.value=VIDEO_EFFECTS.index(self.effect.get())
+        if self.effect_strength_value is not None:self.effect_strength_value.value=float(self.effect_strength.get())
+        self.effect_status.set(f'Effect: {self.effect.get()} · {self.effect_strength.get():.0%}')
+        self.app.log('Camera preview effect: '+self.effect.get())
 
     def start(self):
         if not self.app.console.active:return
@@ -114,7 +199,8 @@ class CameraPanel:
         context=mp.get_context('spawn')
         self.messages=context.Queue(maxsize=6);self.stop_event=context.Event()
         self.vision_mode=context.Value('i',('Off','Face','Motion','Hands').index(self.mode.get()));self.vision_overlay=context.Value('i',int(self.overlay.get()))
-        self.process=context.Process(target=capture_worker,args=(self.messages,self.stop_event,self.source.get(),self.vision_mode,self.vision_overlay),daemon=True)
+        self.effect_mode=context.Value('i',VIDEO_EFFECTS.index(self.effect.get()));self.effect_strength_value=context.Value('d',float(self.effect_strength.get()))
+        self.process=context.Process(target=capture_worker,args=(self.messages,self.stop_event,self.source.get(),self.vision_mode,self.vision_overlay,self.effect_mode,self.effect_strength_value),daemon=True)
         if self.mode.get()=='Hands' and RUNTIME.is_file():mp.set_executable(str(RUNTIME))
         try:self.process.start()
         finally:mp.set_executable(sys.executable)
@@ -180,7 +266,7 @@ class CameraPanel:
             self.stop_event.set();self.process.join(timeout=0.15)
             if self.process.is_alive():self.process.terminate();self.process.join(timeout=0.2)
             self.messages.close();self.process=None
-            self.vision_mode=None;self.vision_overlay=None
+            self.vision_mode=None;self.vision_overlay=None;self.effect_mode=None;self.effect_strength_value=None
             if log:self.app.log('Camera stopped')
         self.gestures.gate.reset()
         self.target=None;self.last_tracking=None;self.gaze_y=0;self.vision_status.set("Vision stopped")
