@@ -33,6 +33,16 @@ def identify(port):
     return False
 
 
+def app_is_running():
+    """Probe BRO's singleton lock without holding it during serial detection."""
+    try:
+        lock = instance_lock()
+    except RuntimeError:
+        return True
+    lock.close()
+    return False
+
+
 def main():
     directory = Path.home() / ".cache" / "bloomface"
     directory.mkdir(parents=True, exist_ok=True)
@@ -46,19 +56,14 @@ def main():
         ports = {p.device: p for p in list_ports.comports() if p.vid == 0x303A}
         opened.intersection_update(ports)
         attempts = {p: n for p, n in attempts.items() if p in ports}
+        if app_is_running():
+            time.sleep(2)
+            continue
         for port in ports:
             if port in opened or attempts.get(port, 0) >= 8:
                 continue
-            # Do not open or probe a port while a BloomFace window is running.
-            try:
-                app_lock = instance_lock()
-            except RuntimeError:
-                break
-            try:
-                attempts[port] = attempts.get(port, 0) + 1
-                matched = identify(port)
-            finally:
-                app_lock.close()
+            attempts[port] = attempts.get(port, 0) + 1
+            matched = identify(port)
             if matched:
                 subprocess.Popen([sys.executable, str(HERE / "bloomface.py"), "--port", port], cwd=HERE)
                 opened.add(port)
