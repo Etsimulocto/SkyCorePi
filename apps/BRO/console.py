@@ -6,6 +6,7 @@ from chat import ChatPanel
 from gamepad import Gamepad
 from dashboard import Dashboard
 from audio import AudioPanel
+from hardware_bay import HardwareBay
 
 SPEAKERS=("BRO","Sky","Cold","Monday","GRIT")
 SPEAKER_HUES={"BRO":0.46,"Sky":0.60,"Cold":0.51,"Monday":0.90,"GRIT":0.08}
@@ -64,6 +65,7 @@ class Console:
         ttk.Button(self.dev,text="Copy log",command=app.copy_log).pack(fill="x",pady=5)
         self.camera_feed=CameraPanel(self.dev,app)
         self.camera=self.camera_feed.frame
+        self.hardware_bay=HardwareBay(self.dev,app)
         self.show_output("BRO","Face online. Ready to build.",source="sample")
         self.chat=ChatPanel(self)
         self.gamepad=Gamepad(self)
