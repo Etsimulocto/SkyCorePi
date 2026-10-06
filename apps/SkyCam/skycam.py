@@ -2,7 +2,7 @@
 # run with: python3 ~/SkyCam/skycam.py
 # path: /home/quarterbitgames/SkyCam/skycam.py
 # description: BloomCore SkyCam tuned for Arducam 8MP USB Camera.
-# version: 1.6
+# version: 1.7
 # format: bloomcore/v1.3
 
 import cv2, subprocess, tempfile, os, time, shutil, tkinter as tk
@@ -12,7 +12,11 @@ BASE=os.path.expanduser("~/SkyCam")
 CAPTURES=os.path.join(BASE,"captures")
 os.makedirs(CAPTURES,exist_ok=True)
 
-CAMERA="/dev/video0"
+# CAMERA is discovered dynamically. Do not hardcode /dev/videoN: USB/V4L2 node
+# numbers can change and this Arducam also exposes a metadata-only node.
+CAMERA=None
+PREFERRED_CAMERA_TEXT="Arducam 8MP USB Camera"
+PREFERRED_CAMERA_SERIAL="AC20251017V0"
 WIDTH,HEIGHT,FPS=1280,720,30
 
 BG="#050505"; FG="#ffffff"; BTN_BG="#1b1b1b"; ACTIVE="#333333"
@@ -28,6 +32,78 @@ video_item=None
 
 def set_status(text, good=True):
     status.config(text=text, fg=GOOD if good else WARN)
+
+
+def video_devices():
+    devices=[]
+    try:
+        for name in os.listdir("/dev"):
+            if not name.startswith("video"):
+                continue
+            suffix=name[5:]
+            if suffix.isdigit():
+                devices.append((int(suffix),f"/dev/{name}"))
+    except OSError:
+        return []
+    return [path for _,path in sorted(devices)]
+
+
+def camera_probe(device):
+    """Return V4L2 info only for real video-capture nodes, never metadata-only nodes."""
+    try:
+        result=subprocess.run(
+            ["v4l2-ctl","-d",device,"--all"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+    except (OSError,subprocess.SubprocessError):
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    text=(result.stdout or "")+(result.stderr or "")
+
+    # Inspect Device Caps specifically. The Arducam exposes /dev/video1 as
+    # Metadata Capture; its broader Capabilities list also mentions video.
+    # Looking only for the phrase "Video Capture" anywhere can therefore
+    # select the wrong node.
+    marker="Device Caps"
+    if marker not in text:
+        return None
+    caps=text.split(marker,1)[1]
+    for stop in ("Media Driver Info:","Interface Info:","Entity Info:"):
+        if stop in caps:
+            caps=caps.split(stop,1)[0]
+            break
+    if "Video Capture" not in caps:
+        return None
+
+    return text
+
+
+def find_camera():
+    """Prefer the known Arducam capture node, then any valid V4L2 capture node."""
+    valid=[]
+    for device in video_devices():
+        info=camera_probe(device)
+        if info is None:
+            continue
+        score=0
+        if PREFERRED_CAMERA_TEXT in info:
+            score+=10
+        if PREFERRED_CAMERA_SERIAL and PREFERRED_CAMERA_SERIAL in info:
+            score+=100
+        valid.append((score,device))
+
+    if not valid:
+        return None
+
+    # Highest identity score wins; lower /dev/videoN wins ties.
+    valid.sort(key=lambda item:(-item[0],int(item[1].replace("/dev/video",""))))
+    return valid[0][1]
 
 
 def clipboard_copy_png(path):
@@ -51,6 +127,8 @@ def clipboard_copy_png(path):
 
 
 def run_v4l2(args, capture=False):
+    if not CAMERA:
+        return subprocess.CompletedProcess([],1,"","")
     return subprocess.run(
         ["v4l2-ctl","-d",CAMERA]+args,
         check=False,
@@ -89,19 +167,46 @@ def adjust_ctrl(name,delta,minimum,maximum,label):
 
 
 def connect_camera():
-    global cap
+    global cap,CAMERA
     try:
         if cap is not None:
             cap.release()
     except Exception:
         pass
 
+    cap=None
+    CAMERA=find_camera()
+    if not CAMERA:
+        return False
+
     cap=cv2.VideoCapture(CAMERA,cv2.CAP_V4L2)
     cap.set(cv2.CAP_PROP_FOURCC,cv2.VideoWriter_fourcc(*"MJPG"))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,HEIGHT)
     cap.set(cv2.CAP_PROP_FPS,FPS)
-    return cap.isOpened()
+
+    if not cap.isOpened():
+        try: cap.release()
+        except Exception: pass
+        cap=None
+        return False
+
+    # Opening is not enough: prove this node actually produces a frame.
+    # This protects against virtual/metadata nodes that may open but are not
+    # usable as the SkyCam image stream.
+    for _ in range(5):
+        try:
+            ok,_frame=cap.read()
+        except Exception:
+            ok=False
+        if ok:
+            return True
+        time.sleep(0.05)
+
+    try: cap.release()
+    except Exception: pass
+    cap=None
+    return False
 
 
 root=tk.Tk()
@@ -186,7 +291,10 @@ def save_image():
 
 
 def refresh_camera():
-    set_status("Camera refreshed ✓",True) if connect_camera() else set_status("Camera not found",False)
+    if connect_camera():
+        set_status(f"Camera refreshed ✓ {CAMERA}",True)
+    else:
+        set_status("Camera not found",False)
 
 
 def rotate_image():
@@ -276,6 +384,8 @@ def exposure_up(): exposure_adjust(20)
 
 def camera_info():
     values=[]
+    if CAMERA:
+        values.append(CAMERA)
     for label,name in (("B","brightness"),("C","contrast"),("S","sharpness"),("G","gain")):
         value=get_ctrl(name)
         if value is not None:
@@ -348,7 +458,7 @@ def update_frame():
 
     if not ret:
         set_status("Searching for camera...",False)
-        if connect_camera(): set_status("Camera reconnected ✓",True)
+        if connect_camera(): set_status(f"Camera reconnected ✓ {CAMERA}",True)
         root.after(1000,update_frame)
         return
 
